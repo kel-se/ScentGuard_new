@@ -1,6 +1,6 @@
-# Task List - Fix Offline Detection Bug
+# Task List - Proper Non-Scrollable Authentication Redesign
 
-- [x] Modify `MainViewModel.kt` to add background status ticker and update thresholds
-- [x] Update `CriticalAlertScreen.kt` to use unified `signalStatus`
-- [x] Verify build and fix syntax issues
-- [x] Create walkthrough for the user
+- [x] Create `AuthUIConfig.kt` to centralize design parameters
+- [x] Rework `LoginScreen.kt` with dynamic height scaling and premium gradient
+- [x] Rework `SignUpScreen.kt` with mirror logic and optimized compact form
+- [x] Verify build and viewport fit

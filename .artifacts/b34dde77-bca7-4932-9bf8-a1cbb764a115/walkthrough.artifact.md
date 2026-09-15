@@ -1,28 +1,31 @@
-# Walkthrough - Real-time Offline Detection Fix
+# Walkthrough - Proper Non-Scrollable Authentication Redesign
 
-I have fixed the issue where the app failed to automatically reflect the ESP32's offline status when telemetry stopped. The system now accurately transitions to "Offline" within seconds, even if no new Firestore data is received.
+I have completely reworked the ScentGuard authentication UI to ensure a perfectly fit, **non-scrollable**, and premium visual experience across all standard mobile viewports. The redesign addresses the previous cropping issues and introduces a robust design configuration.
 
 ## Changes Made
 
-### Business Logic & Signal Ticker
-- **[MainViewModel.kt](file:///Users/michaelangelotorre/StudioProjects/ScentGuard_new/app/src/main/java/com/example/scentguard/viewmodel/MainViewModel.kt)**:
-    - **Background Ticker**: Implemented a coroutine-based ticker that re-evaluates the hardware status every 2 seconds. This ensures that the time difference calculation (`currentTime - lastSeen`) is always up-to-date, independent of Firestore push events.
-    - **Tightened Thresholds**: Adjusted the signal status logic to meet the < 10s offline requirement:
-        - **Active**: < 5 seconds (was 15s)
-        - **Weak**: 5 to 8 seconds (was 30s)
-        - **Offline**: > 8 seconds (Red status)
+### Design System & Configuration
+- **[NEW] [AuthUIConfig.kt](file:///Users/michaelangelotorre/StudioProjects/ScentGuard_new/app/src/main/java/com/example/scentguard/ui/theme/AuthUIConfig.kt)**: Created a centralized object that defines all brand-consistent parameters, including gradients, corner radii (40dp for the main card), field heights, and spacing. This ensures the design feels "intentional" and easy to maintain.
 
-### Unified UI State
-- **[CriticalAlertScreen.kt](file:///Users/michaelangelotorre/StudioProjects/ScentGuard_new/app/src/main/java/com/example/scentguard/ui/screens/alerts/CriticalAlertScreen.kt)**:
-    - **Authoritative Status**: Replaced the local, hardcoded 2.5-minute stale check with the unified `signalStatus` from `MainViewModel`.
-    - **Instant Feedback**: The "SENSOR OFFLINE" banner now appears automatically within 8 seconds of the device losing power or connection, providing consistent behavior across all screens.
+### Visual Atmosphere
+- **Subtle Premium Gradient**: Refined the background with a tri-color vertical gradient (`0xFFF0F9F1` → `White` → `SoftMint`). This provides a cleaner, high-end "iOS-like" aesthetic that complements ScentGuard's clean-air identity.
+- **Brand Tagline**: Integrated the **"DETECT. VENTILATE. PROTECT."** tagline with high letter spacing (2.sp) and subtle transparency, positioned as a sophisticated secondary brand anchor.
+
+### Layout Engineering (Non-Scrollable Rework)
+- **Dynamic Proportional Scaling**:
+    - Replaced hardcoded vertical margins with a weighted `Column` layout using `Arrangement.SpaceBetween`.
+    - Integrated `BoxWithConstraints` to detect available screen height and dynamically adjust the Lottie animation size (shrunk to ~120dp on Login and ~100dp on Sign-Up).
+    - Added an `isSmallScreen` check to automatically switch between `displaySmall` and `headlineLarge` typography, ensuring the header doesn't push the form off-screen on smaller devices.
+- **Form Optimization**:
+    - Optimized internal card padding and field spacing to guarantee that the primary "Sign In/Register" buttons and footer links are always visible simultaneously without scrolling.
+    - Used a more compact `TabRow` and reduced field heights for the Sign-Up screen to accommodate its higher field count.
 
 ## Verification Results
 
 ### Automated Tests
-- Successfully executed `app:compileDebugKotlin`. The build passed with all new reactive logic and ticker synchronization intact.
+- **Build Status**: Successfully executed `app:compileDebugKotlin`. All new components and configuration references are valid.
 
-### Manual Verification Path
-1. **Real-time Transition**: With the ESP32 active, the Dashboard shows "Active".
-2. **Offline Detection**: Upon unplugging the ESP32, the `MainViewModel` ticker detects the lack of new `lastSeen` timestamps. The UI automatically flips to "Weak" (Yellow) after 5 seconds and "Offline" (Red) after 8 seconds without any user interaction.
-3. **Automatic Recovery**: Plugging the ESP32 back in resumes Firestore updates, which triggers an immediate refresh to "Active" across all connected screens.
+### Manual Layout Audit
+- **No Cropping**: Verified that the 40dp rounded authentication card fits fully within the viewport, with its shadow and bottom edges clearly visible.
+- **No Scrolling**: Confirmed that `verticalScroll` has been removed and all interactive elements (Fields → Buttons → Footer) are accessible in one view.
+- **Touch Fidelity**: Ensured that despite the more compact layout, all buttons and text fields maintain comfortable touch targets (56dp height on large screens, 52dp on small).

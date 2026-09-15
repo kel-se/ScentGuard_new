@@ -1,43 +1,57 @@
-# Implementation Plan - Fix Offline Detection Bug
+# Implementation Plan - Proper Non-Scrollable Authentication Redesign
 
-The goal is to fix a bug where the app fails to transition to an "Offline" state automatically when the ESP32 stops sending telemetry. The fix involves implementing an independent "Ticker" that re-evaluates the hardware connection status every 2 seconds, regardless of whether new data arrives from Firestore.
+Rework the authentication UI from the ground up to ensure a perfectly fit, non-scrollable, and premium visual experience. This includes a robust "Design Configuration" structure and a fully responsive layout that avoids cropping.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> **Authoritative State**: I will tighten the "Active" and "Offline" thresholds to provide near-real-time feedback as requested:
-> - **Active**: < 5s (Green)
-> - **Weak**: 5s to 8s (Yellow)
-> - **Offline**: > 8s (Red)
+> **Dynamic Scaling**: To guarantee a non-scrollable UI on all screen sizes without cropping, I will implement **dynamic component scaling**. The Lottie animation and vertical spacers will automatically shrink on smaller viewports to prioritize the visibility of the authentication form and buttons.
 >
-> **Unified UI**: The `CriticalAlertScreen` will be updated to use this same authoritative `signalStatus` StateFlow, replacing its internal, slower (2.5 minute) stale check.
+> **Design Configuration**: I will introduce a `AuthUIConfig` object to centralize all styling parameters (colors, spacing, typography), ensuring a cohesive and "intentional" look as requested.
 
 ## Proposed Changes
 
-### Business Logic
+### Configuration Layer
 
-#### [MODIFY] [MainViewModel.kt](file:///Users/michaelangelotorre/StudioProjects/ScentGuard_new/app/src/main/java/com/example/scentguard/viewmodel/MainViewModel.kt)
-- **Signal Ticker**: Add a background coroutine in `viewModelScope` that executes every 2 seconds.
-- **Dynamic Re-evaluation**: The ticker will call `updateSignalStatus(liveRestaurantData.value)` to re-calculate `diffMs` against the current system time.
-- **Threshold Update**: Update the logic to:
-    - `diffMs < 5000` -> **Active**
-    - `diffMs < 8000` -> **Weak**
-    - Else -> **Offline**
+#### [NEW] `AuthUIConfig.kt`
+Create a centralized configuration for the authentication theme:
+- **Gradient**: `SoftMint` to `White` subtle brush.
+- **Card**: 40dp rounded corners, specific content padding, elevation.
+- **Fields**: 20dp rounded corners, specific height (52dp or 56dp).
+- **Typography**: Detailed styles for H1, Tagline, and Subtitles.
 
-### User Interface
+### UI Screens
 
-#### [MODIFY] [CriticalAlertScreen.kt](file:///Users/michaelangelotorre/StudioProjects/ScentGuard_new/app/src/main/java/com/example/scentguard/ui/screens/alerts/CriticalAlertScreen.kt)
-- **State Injection**: Access `mainViewModel.signalStatus` to drive the "SENSOR OFFLINE" banner.
-- **Consistency**: Remove the hardcoded `150000ms` (2.5m) check and replace it with `signalStatus == "Offline"`.
+#### [MODIFY] [LoginScreen.kt](file:///Users/michaelangelotorre/StudioProjects/ScentGuard_new/app/src/main/java/com/example/scentguard/ui/screens/login/LoginScreen.kt)
+- **Layout Architecture**:
+    - Use `BoxWithConstraints` to detect available height.
+    - Outer `Box` for the premium gradient.
+    - A `Column` with `fillMaxSize` containing two main sections:
+        1. **Brand Section**: Scalable Logo + Tagline + Lottie.
+        2. **Card Section**: The authentication form.
+- **Responsive Sizing**:
+    - Lottie height will be calculated as a percentage of screen height (e.g., `maxHeight * 0.2f`).
+    - Spacers will use `weight` or dynamic Dp values to avoid pushing the card off-screen.
+- **Non-Scrollable Guarantee**: Ensure no `verticalScroll` is used and all elements are constrained within `maxHeight`.
+
+#### [MODIFY] [SignUpScreen.kt](file:///Users/michaelangelotorre/StudioProjects/ScentGuard_new/app/src/main/java/com/example/scentguard/ui/screens/signup/SignUpScreen.kt)
+- **Layout Architecture**: Mirror the Login screen structure for consistency.
+- **Compact Form Optimization**:
+    - Reduce internal card padding slightly to accommodate more fields.
+    - Use a more compact `TabRow`.
+    - Dynamically hide/shrink the brand tagline if the screen height is extremely limited, ensuring the primary "Register" actions are always visible.
 
 ## Verification Plan
 
 ### Automated Tests
-- Run `app:compileDebugKotlin` to ensure no syntax errors.
+- Build and run `app:compileDebugKotlin` to verify the new configuration structure and layout logic.
 
 ### Manual Verification
-1. **Active**: Plug in ESP32, verify "Active" (Green) status in Dashboard and Devices screens.
-2. **Weak Transition**: Unplug ESP32. Verify status changes to "Weak" (Yellow) within ~5 seconds without interacting with the app.
-3. **Offline Transition**: Continue waiting. Verify status changes to "Offline" (Red) within ~8 seconds without interacting with the app.
-4. **Alert Sync**: Open the Critical Alert feed during a danger event; unplug ESP32 and verify the "SENSOR OFFLINE" banner appears automatically within 8 seconds.
-5. **Recovery**: Plug ESP32 back in. Verify all screens return to "Active" automatically within a few seconds.
+1. **Screen Size Audit**:
+    - Test on a standard device (e.g., Pixel 7) and a smaller device (e.g., Pixel 3a or custom small emulator).
+    - **Criteria**: No scrollbars, no "cut off" buttons, and the bottom "Sign Up/In" footer must be fully visible.
+2. **Visual Polish**:
+    - Verify the gradient fills the entire screen.
+    - Confirm the card has a "floating" premium feel with consistent rounded corners.
+3. **Interactive Test**:
+    - Verify all tap targets (fields, buttons) function correctly without UI jitter.
