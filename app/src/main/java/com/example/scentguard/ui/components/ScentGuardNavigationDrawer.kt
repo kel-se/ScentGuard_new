@@ -1,6 +1,5 @@
 package com.example.scentguard.ui.components
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,12 +11,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.scentguard.R
 import com.example.scentguard.data.model.UserProfile
 import com.example.scentguard.data.model.MascotAvatars
 import com.example.scentguard.navigation.Screen
@@ -41,31 +36,7 @@ fun ScentGuardNavigationDrawer(
             ) {
                 Spacer(Modifier.height(24.dp))
                 
-                // App Logo & Brand
-                Row(
-                    modifier = Modifier.padding(horizontal = 28.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        modifier = Modifier.size(40.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.scentguard_icon),
-                            contentDescription = null,
-                            modifier = Modifier.padding(4.dp),
-                            contentScale = ContentScale.Fit
-                        )
-                    }
-                    Spacer(Modifier.width(16.dp))
-                    Text(
-                        text = "ScentGuard",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = (-0.5).sp
-                    )
-                }
+
 
                 Spacer(Modifier.height(32.dp))
 
