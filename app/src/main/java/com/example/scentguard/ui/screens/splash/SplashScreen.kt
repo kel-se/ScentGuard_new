@@ -112,7 +112,7 @@ fun SplashScreen(
                 modifier = Modifier.padding(24.dp)
             ) {
                 Image(
-                    painter = painterResource(id = R.drawable.ic_scentguard_logo_vector),
+                    painter = painterResource(id = R.drawable.scentguard_icon),
                     contentDescription = "ScentGuard Logo",
                     modifier = Modifier
                         .size(120.dp)

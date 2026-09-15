@@ -52,9 +52,9 @@ fun ScentGuardNavigationDrawer(
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Image(
-                            painter = painterResource(id = R.drawable.ic_scentguard_logo_vector),
+                            painter = painterResource(id = R.drawable.scentguard_icon),
                             contentDescription = null,
-                            modifier = Modifier.padding(8.dp),
+                            modifier = Modifier.padding(4.dp),
                             contentScale = ContentScale.Fit
                         )
                     }

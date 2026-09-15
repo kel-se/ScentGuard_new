@@ -126,7 +126,7 @@ fun SignUpScreen(
                     Spacer(modifier = Modifier.height(32.dp))
                     
                     Image(
-                        painter = painterResource(id = R.drawable.ic_scentguard_logo_vector),
+                        painter = painterResource(id = R.drawable.scentguard_icon),
                         contentDescription = null,
                         modifier = Modifier.size(64.dp)
                     )
