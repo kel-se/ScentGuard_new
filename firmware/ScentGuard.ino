@@ -34,17 +34,19 @@
 #define SANITATION_CYCLES 10
 #define SANITATION_DURATION 50000UL
 
+#define HOT_TEMPERATURE 33.0
+
 // Pins
 #define RELAY_CH1_PIN 23
 #define RELAY_CH2_PIN 25
 #define MQ135_PIN 34
-#define DHTPIN 4
+#define DHT_PIN 22
+#define DHT_TYPE DHT11
 #define GREEN_LED 18
 #define RED_LED 19
 #define BOOT_BUTTON 0
 
-#define DHTTYPE DHT11
-DHT dht(DHTPIN, DHTTYPE);
+DHT dht(DHT_PIN, DHT_TYPE);
 
 // =====================================================
 // 3. GLOBALS
@@ -78,8 +80,27 @@ int sanitationCycleCount = 0;
 bool wasInDanger = false;
 String lastInternalStatus = "SAFE";
 
-float currentTemp = 0.0;
+float temperature = 0.0;
+String temperatureStatus = "NORMAL";
 float currentHum = 0.0;
+
+// =====================================================
+// 4. FUNCTIONS
+// =====================================================
+
+float readTemperature() {
+    float t = dht.readTemperature();
+    if (!isnan(t)) {
+        temperature = t;
+    }
+    if (temperature >= HOT_TEMPERATURE) {
+        temperatureStatus = "HOT";
+    } else {
+        temperatureStatus = "NORMAL";
+    }
+    return temperature;
+}
+
 void setFan(bool enabled) {
     digitalWrite(
             RELAY_CH1_PIN,
@@ -93,6 +114,7 @@ void setFan(bool enabled) {
         );
     }
 }
+
 void setPump(bool enabled) {
     digitalWrite(
             RELAY_CH2_PIN,
@@ -110,6 +132,7 @@ void setPump(bool enabled) {
         );
     }
 }
+
 void startSanitation() {
     if (isSanitationActive) {
         return;
@@ -132,6 +155,7 @@ void startSanitation() {
             "Sanitation Spray #1 STARTED"
     );
 }
+
 void stopSanitation() {
     isSanitationActive = false;
     sanitationCycleCount = 0;
@@ -142,6 +166,7 @@ void stopSanitation() {
     Serial.println("Pump OFF");
     Serial.println("======================================");
 }
+
 void updateSanitation() {
     if (!isSanitationActive) {
         return;
@@ -195,6 +220,7 @@ void updateSanitation() {
         }
     }
 }
+
 class MyCallbacks : public BLECharacteristicCallbacks {
     void onWrite(
             BLECharacteristic *pCharacteristic
@@ -250,6 +276,7 @@ class MyCallbacks : public BLECharacteristicCallbacks {
         }
     }
 };
+
 void startProvisioning() {
     isProvisioning = true;
     Serial.println(
@@ -302,6 +329,7 @@ void startProvisioning() {
             "Waiting for App connection..."
     );
 }
+
 bool loadCredentials() {
     preferences.begin(
             "scentguard",
@@ -351,6 +379,7 @@ bool loadCredentials() {
             WL_CONNECTED
     );
 }
+
 String getTimestamp() {
     time_t now =
             time(nullptr);
@@ -375,6 +404,7 @@ String getTimestamp() {
             timestamp
     );
 }
+
 String getSlotID() {
     struct tm timeinfo;
     if (
@@ -408,6 +438,7 @@ String getSlotID() {
     );
     return id;
 }
+
 void syncTime() {
     configTime(
             0,
@@ -432,6 +463,7 @@ void syncTime() {
             "\nTime OK!"
     );
 }
+
 void readRemoteConfig() {
     String path =
             "restaurants/" +
@@ -486,6 +518,7 @@ void readRemoteConfig() {
         );
     }
 }
+
 void uploadTelemetry(
         int gasValue,
         String airStatus
@@ -504,6 +537,10 @@ void uploadTelemetry(
             isFanPhysicallyActive
             ? "ON"
             : "OFF"
+    );
+    content.set(
+            "fields/temperature/doubleValue",
+            temperature
     );
     String ts =
             getTimestamp();
@@ -525,7 +562,7 @@ void uploadTelemetry(
                     "",
                     path.c_str(),
                     content.raw(),
-                    "currentGasPpm,airStatus,fanStatus,lastSeen"
+                    "currentGasPpm,airStatus,fanStatus,lastSeen,temperature"
             )
             ) {
         Serial.println(
@@ -533,6 +570,7 @@ void uploadTelemetry(
         );
     }
 }
+
 void uploadHistorySnapshot(
         int gasValue,
         String airStatus
@@ -559,6 +597,10 @@ void uploadHistorySnapshot(
             "fields/fanMode/stringValue",
             currentFanMode
     );
+    content.set(
+            "fields/temperature/doubleValue",
+            temperature
+    );
     String ts =
             getTimestamp();
     if (
@@ -583,7 +625,7 @@ void uploadHistorySnapshot(
                     "",
                     path.c_str(),
                     content.raw(),
-                    "currentGasPpm,airStatus,fanStatus,fanMode,timestamp"
+                    "currentGasPpm,airStatus,fanStatus,fanMode,timestamp,temperature"
             )
             ) {
         Serial.println(
@@ -598,6 +640,7 @@ void uploadHistorySnapshot(
         );
     }
 }
+
 void setup() {
     Serial.begin(115200);
 
@@ -675,19 +718,19 @@ void loop() {
     // 1. FAST SENSOR READING (Non-blocking)
     int gasValue = analogRead(MQ135_PIN);
 
-    // Read DHT11
-    float t = dht.readTemperature();
-    float h = dht.readHumidity();
-    if (!isnan(t)) currentTemp = t;
-    if (!isnan(h)) currentHum = h;
+    // Read DHT11 Temperature
+    readTemperature();
 
     String airStatus = (gasValue >= thresholdDanger) ? "DANGER" : (gasValue >= thresholdWarn ? "WARN" : "SAFE");
 
+    // Interruption check: If air status is not SAFE, active sanitation must be interrupted immediately
+    if (airStatus != "SAFE" && isSanitationActive) {
+        Serial.println("Sanitation interrupted: Air quality increased");
+        stopSanitation();
+    }
+
     // 2. STATUS CHANGE LOGIC
     if (airStatus != lastInternalStatus) {
-        if (airStatus != "SAFE" && isSanitationActive) {
-            stopSanitation();
-        }
         if (airStatus == "DANGER") {
             wasInDanger = true;
         }
@@ -731,7 +774,7 @@ void loop() {
     if (now - lastSerial >= SERIAL_INTERVAL) {
         lastSerial = now;
         Serial.println("--------------------------------------");
-        Serial.printf("[SENSOR] Gas: %d | Temp: %.1f°C | Status: %s\n", gasValue, currentTemp, airStatus.c_str());
+        Serial.printf("[SENSOR] Gas: %d | Temp: %.1f C - %s | Status: %s\n", gasValue, temperature, temperatureStatus.c_str(), airStatus.c_str());
         Serial.printf("[FAN] Status: %s | Mode: %s\n", isFanPhysicallyActive ? "ON" : "OFF", currentFanMode.c_str());
         Serial.printf("[PUMP] Status: %s\n", isSanitationActive ? "ACTIVE" : "READY");
         Serial.printf("[WIFI] %s\n", (WiFi.status() == WL_CONNECTED) ? "Connected" : "Disconnected");
