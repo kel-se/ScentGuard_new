@@ -37,6 +37,7 @@ import com.example.scentguard.ui.theme.ErrorRed
 import com.example.scentguard.ui.theme.PremiumGreen
 import com.example.scentguard.ui.theme.WarningOrange
 import com.example.scentguard.utils.Resource
+import com.example.scentguard.utils.isAtBottom
 import com.example.scentguard.utils.isScrollingUp
 import com.example.scentguard.utils.responsiveContainer
 import com.example.scentguard.utils.shimmerEffect
@@ -67,7 +68,7 @@ fun ReportsScreen(
     val scope = rememberCoroutineScope()
     
     val scrollState = rememberScrollState()
-    val isNavVisible = scrollState.isScrollingUp()
+    val isNavVisible = scrollState.isScrollingUp() || scrollState.isAtBottom()
 
     ScentGuardNavigationDrawer(
         user = user,

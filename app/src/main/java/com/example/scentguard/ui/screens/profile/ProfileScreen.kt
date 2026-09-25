@@ -32,6 +32,7 @@ import com.example.scentguard.ui.components.ScentGuardNavigationDrawer
 import com.example.scentguard.ui.components.ScentGuardMascotAvatar
 import com.example.scentguard.data.model.MascotAvatars
 import com.example.scentguard.utils.Resource
+import com.example.scentguard.utils.isAtBottom
 import com.example.scentguard.utils.isScrollingUp
 import com.example.scentguard.utils.responsiveContainer
 import com.example.scentguard.viewmodel.MainViewModel
@@ -53,7 +54,7 @@ fun ProfileScreen(
     var showAvatarPicker by remember { mutableStateOf(false) }
 
     val scrollState = rememberScrollState()
-    val isNavVisible = scrollState.isScrollingUp()
+    val isNavVisible = scrollState.isScrollingUp() || scrollState.isAtBottom()
 
     if (showAvatarPicker) {
         AvatarPickerSheet(

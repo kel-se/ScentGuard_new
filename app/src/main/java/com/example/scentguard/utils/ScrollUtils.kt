@@ -29,6 +29,29 @@ fun LazyListState.isScrollingUp(): Boolean {
 }
 
 /**
+ * Returns true if the LazyListState has reached the bottom boundary of its scrollable content.
+ */
+@Composable
+fun LazyListState.isAtBottom(tolerancePx: Int = 10): Boolean {
+    return remember(this) {
+        derivedStateOf {
+            val info = layoutInfo
+            val visibleItems = info.visibleItemsInfo
+            val totalItems = info.totalItemsCount
+            if (totalItems == 0 || visibleItems.isEmpty()) {
+                false
+            } else {
+                val lastVisibleItem = visibleItems.last()
+                val isLastItem = lastVisibleItem.index == totalItems - 1
+                val itemBottom = lastVisibleItem.offset + lastVisibleItem.size
+                val viewportBottom = info.viewportEndOffset
+                isLastItem && (itemBottom <= viewportBottom + tolerancePx)
+            }
+        }
+    }.value
+}
+
+/**
  * Returns true if the container is scrolling up (or at the top), false if scrolling down.
  */
 @Composable
@@ -39,6 +62,19 @@ fun ScrollState.isScrollingUp(): Boolean {
             (previousOffset >= value).also {
                 previousOffset = value
             }
+        }
+    }.value
+}
+
+/**
+ * Returns true if the ScrollState has reached the bottom boundary of its scrollable content.
+ */
+@Composable
+fun ScrollState.isAtBottom(tolerancePx: Int = 10): Boolean {
+    return remember(this) {
+        derivedStateOf {
+            if (maxValue == 0) false
+            else value >= (maxValue - tolerancePx)
         }
     }.value
 }

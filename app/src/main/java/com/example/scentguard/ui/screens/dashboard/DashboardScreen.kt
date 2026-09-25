@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
@@ -31,6 +32,7 @@ import com.example.scentguard.data.model.MascotAvatars
 import com.example.scentguard.navigation.Screen
 import com.example.scentguard.ui.components.*
 import com.example.scentguard.utils.Resource
+import com.example.scentguard.utils.isAtBottom
 import com.example.scentguard.utils.isScrollingUp
 import com.example.scentguard.viewmodel.MainViewModel
 import kotlinx.coroutines.delay
@@ -57,7 +59,7 @@ fun DashboardScreen(
     val scope = rememberCoroutineScope()
     
     val lazyListState = rememberLazyListState()
-    val isNavVisible = lazyListState.isScrollingUp()
+    val isNavVisible = lazyListState.isScrollingUp() || lazyListState.isAtBottom()
 
     ScentGuardNavigationDrawer(
         user = user,
@@ -412,58 +414,55 @@ fun MetricsGrid(
     pumpStatus: String = "OFF",
     onPumpClick: () -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(
             "HARDWARE STATUS",
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
             letterSpacing = 1.sp,
-            modifier = Modifier.padding(bottom = 4.dp)
+            modifier = Modifier.padding(bottom = 2.dp)
         )
         
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Max), 
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
             MetricCard(
                 label = "Gas Level",
                 value = gasLevel.toString(),
                 unit = "ppm",
                 icon = Icons.Outlined.Cloud,
-                modifier = Modifier.weight(1.2f), // More weight to primary metric
-                valueStyle = MaterialTheme.typography.headlineLarge
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                valueStyle = MaterialTheme.typography.headlineMedium
             )
             MetricCard(
-                label = "System Temp",
+                label = "System Temperature",
                 value = String.format(java.util.Locale.getDefault(), "%.1f", temp),
                 unit = "°C",
                 icon = Icons.Outlined.Thermostat,
-                modifier = Modifier.weight(0.8f), // Less weight to secondary
-                valueStyle = MaterialTheme.typography.headlineSmall,
-                iconSize = 16.dp
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                valueStyle = MaterialTheme.typography.headlineMedium,
+                iconSize = 22.dp
             )
-            if (isWideScreen) {
-                MetricCard(
-                    label = "Pump",
-                    value = if (pumpStatus == "ON") "Spraying" else "Standby",
-                    unit = "",
-                    icon = Icons.Outlined.Opacity,
-                    modifier = Modifier.weight(1f).clickable { onPumpClick() },
-                    valueColor = if (pumpStatus == "ON") Color(0xFF34C759) else MaterialTheme.colorScheme.onSurfaceVariant,
-                    valueStyle = MaterialTheme.typography.headlineSmall
-                )
-            }
         }
         
-        if (!isWideScreen) {
-            MetricCard(
-                label = "Sanitation Pump",
-                value = if (pumpStatus == "ON") "Spraying" else "Standby",
-                unit = "",
-                icon = Icons.Outlined.Opacity,
-                modifier = Modifier.fillMaxWidth().clickable { onPumpClick() },
-                valueStyle = MaterialTheme.typography.headlineMedium,
-                valueColor = if (pumpStatus == "ON") Color(0xFF34C759) else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        MetricCard(
+            label = "Sanitation Pump",
+            value = if (pumpStatus == "ON") "Spraying" else "Standby",
+            unit = "",
+            icon = Icons.Outlined.Opacity,
+            modifier = Modifier.fillMaxWidth(),
+            valueStyle = MaterialTheme.typography.headlineMedium,
+            valueColor = if (pumpStatus == "ON") Color(0xFF34C759) else MaterialTheme.colorScheme.onSurfaceVariant,
+            onClick = onPumpClick
+        )
     }
 }
 
@@ -476,45 +475,68 @@ fun MetricCard(
     modifier: Modifier = Modifier,
     valueStyle: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.headlineLarge,
     valueColor: Color = MaterialTheme.colorScheme.onSurface,
-    iconSize: androidx.compose.ui.unit.Dp = 20.dp
+    iconSize: androidx.compose.ui.unit.Dp = 22.dp,
+    onClick: (() -> Unit)? = null
 ) {
     ScentGuardCard(
         modifier = modifier,
-        cornerRadius = 16.dp, // Consistent rounding
-        contentPadding = 16.dp
+        cornerRadius = 20.dp,
+        contentPadding = 20.dp,
+        onClick = onClick
     ) {
-        Column {
-            Surface(
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.size(32.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(icon, null, tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f), modifier = Modifier.size(iconSize))
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
             Text(
                 text = label.uppercase(), 
-                style = MaterialTheme.typography.labelSmall, 
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                style = MaterialTheme.typography.labelMedium, 
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 fontWeight = FontWeight.Bold,
-                letterSpacing = 0.5.sp
+                letterSpacing = 1.sp,
+                textAlign = TextAlign.Center
             )
-            Row(verticalAlignment = Alignment.Bottom) {
+            
+            Spacer(modifier = Modifier.height(14.dp))
+            
+            Surface(
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                shape = CircleShape,
+                modifier = Modifier.size(44.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icon, 
+                        contentDescription = null, 
+                        tint = MaterialTheme.colorScheme.primary, 
+                        modifier = Modifier.size(iconSize)
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(14.dp))
+            
+            Row(
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.Center
+            ) {
                 Text(
                     text = value, 
                     style = valueStyle, 
                     fontWeight = FontWeight.Black, 
                     color = valueColor,
-                    letterSpacing = (-0.5).sp
+                    letterSpacing = (-0.5).sp,
+                    textAlign = TextAlign.Center
                 )
                 if (unit.isNotEmpty()) {
                     Text(
                         text = unit, 
                         style = MaterialTheme.typography.labelLarge, 
-                        modifier = Modifier.padding(start = 2.dp, bottom = 4.dp), 
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                        modifier = Modifier.padding(start = 4.dp, bottom = 2.dp), 
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                         fontWeight = FontWeight.Bold
                     )
                 }

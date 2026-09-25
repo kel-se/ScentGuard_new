@@ -31,6 +31,7 @@ import com.example.scentguard.ui.components.ScentGuardFloatingNav
 import com.example.scentguard.ui.components.ScentGuardMascotAvatar
 import com.example.scentguard.ui.components.ScentGuardNavigationDrawer
 import com.example.scentguard.utils.Resource
+import com.example.scentguard.utils.isAtBottom
 import com.example.scentguard.utils.isScrollingUp
 import com.example.scentguard.utils.responsiveContainer
 import com.example.scentguard.utils.shimmerEffect
@@ -60,7 +61,7 @@ fun HistoryScreen(
     val scope = rememberCoroutineScope()
     
     val lazyListState = rememberLazyListState()
-    val isNavVisible = lazyListState.isScrollingUp()
+    val isNavVisible = lazyListState.isScrollingUp() || lazyListState.isAtBottom()
 
     ScentGuardNavigationDrawer(
         user = user,

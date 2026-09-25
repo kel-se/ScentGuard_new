@@ -30,6 +30,7 @@ import com.example.scentguard.ui.components.ScentGuardNavigationDrawer
 import com.example.scentguard.ui.components.ScentGuardMascotAvatar
 import com.example.scentguard.data.model.MascotAvatars
 import com.example.scentguard.utils.Resource
+import com.example.scentguard.utils.isAtBottom
 import com.example.scentguard.utils.isScrollingUp
 import com.example.scentguard.utils.responsiveContainer
 import com.example.scentguard.utils.shimmerEffect
@@ -62,7 +63,7 @@ fun StaffScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     
     val lazyListState = rememberLazyListState()
-    val isNavVisible = lazyListState.isScrollingUp()
+    val isNavVisible = lazyListState.isScrollingUp() || lazyListState.isAtBottom()
 
     var userToRemove by remember { mutableStateOf<UserProfile?>(null) }
     var selectedDuration by remember { mutableLongStateOf(24L) }
