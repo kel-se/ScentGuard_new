@@ -1,57 +1,54 @@
-# Implementation Plan - Proper Non-Scrollable Authentication Redesign
+# Implementation Plan - Anti-Slop UI Refinement
 
-Rework the authentication UI from the ground up to ensure a perfectly fit, non-scrollable, and premium visual experience. This includes a robust "Design Configuration" structure and a fully responsive layout that avoids cropping.
+Refine ScentGuard's UI to remove generic AI-generated design patterns ("slop") and replace them with intentional, professional, and product-specific hierarchy. This plan focuses on restraint, consistent rounding, and removing unnecessary motion while preserving the brand's core identity.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> **Dynamic Scaling**: To guarantee a non-scrollable UI on all screen sizes without cropping, I will implement **dynamic component scaling**. The Lottie animation and vertical spacers will automatically shrink on smaller viewports to prioritize the visibility of the authentication form and buttons.
+> **Aesthetic Shift**: We are moving away from the "soft/bubbly" look (40dp radii, breathing animations) towards a more "Industrial/Professional" look (16dp-24dp radii, static status indicators).
 >
-> **Design Configuration**: I will introduce a `AuthUIConfig` object to centralize all styling parameters (colors, spacing, typography), ensuring a cohesive and "intentional" look as requested.
+> **Hierarchy Update**: The "Gas Level" will be established as the primary dashboard metric, with other values (Temp, Humidity) becoming visually secondary to improve immediate cognitive recognition.
 
 ## Proposed Changes
 
-### Configuration Layer
+### 1. Design Tokens & Core Components
 
-#### [NEW] `AuthUIConfig.kt`
-Create a centralized configuration for the authentication theme:
-- **Gradient**: `SoftMint` to `White` subtle brush.
-- **Card**: 40dp rounded corners, specific content padding, elevation.
-- **Fields**: 20dp rounded corners, specific height (52dp or 56dp).
-- **Typography**: Detailed styles for H1, Tagline, and Subtitles.
+#### [MODIFY] [AuthUIConfig.kt](file:///Users/michaelangelotorre/StudioProjects/ScentGuard_new/app/src/main/java/com/example/scentguard/ui/theme/AuthUIConfig.kt)
+- Update `CardCornerRadius` from 40dp to **24dp**.
+- Update `FieldCornerRadius` from 20dp to **12dp**.
+- Remove `BackgroundGradient` in favor of a solid `SoftMint` or `BaseGray`.
+- Reduce `TaglineLetterSpacing` for better readability.
 
-### UI Screens
+#### [MODIFY] [ScentGuardCard.kt](file:///Users/michaelangelotorre/StudioProjects/ScentGuard_new/app/src/main/java/com/example/scentguard/ui/components/ScentGuardCard.kt)
+- Update default `cornerRadius` from 28dp to **16dp**.
+- Refine `borderColor` to be slightly more visible (0.1f alpha instead of 0.05f) to define surfaces without relying on heavy shadows.
 
-#### [MODIFY] [LoginScreen.kt](file:///Users/michaelangelotorre/StudioProjects/ScentGuard_new/app/src/main/java/com/example/scentguard/ui/screens/login/LoginScreen.kt)
-- **Layout Architecture**:
-    - Use `BoxWithConstraints` to detect available height.
-    - Outer `Box` for the premium gradient.
-    - A `Column` with `fillMaxSize` containing two main sections:
-        1. **Brand Section**: Scalable Logo + Tagline + Lottie.
-        2. **Card Section**: The authentication form.
-- **Responsive Sizing**:
-    - Lottie height will be calculated as a percentage of screen height (e.g., `maxHeight * 0.2f`).
-    - Spacers will use `weight` or dynamic Dp values to avoid pushing the card off-screen.
-- **Non-Scrollable Guarantee**: Ensure no `verticalScroll` is used and all elements are constrained within `maxHeight`.
+### 2. Dashboard Refinement
 
-#### [MODIFY] [SignUpScreen.kt](file:///Users/michaelangelotorre/StudioProjects/ScentGuard_new/app/src/main/java/com/example/scentguard/ui/screens/signup/SignUpScreen.kt)
-- **Layout Architecture**: Mirror the Login screen structure for consistency.
-- **Compact Form Optimization**:
-    - Reduce internal card padding slightly to accommodate more fields.
-    - Use a more compact `TabRow`.
-    - Dynamically hide/shrink the brand tagline if the screen height is extremely limited, ensuring the primary "Register" actions are always visible.
+#### [MODIFY] [DashboardScreen.kt](file:///Users/michaelangelotorre/StudioProjects/ScentGuard_new/app/src/main/java/com/example/scentguard/ui/screens/dashboard/DashboardScreen.kt)
+- **AirQualityHero**:
+    - Remove `auraScale` and `auraAlpha` animations.
+    - Replace the "Breathing Aura" with a static, semi-transparent circle background.
+    - Downgrade "Status" typography from `displayLarge` to **`headlineLarge`**.
+    - Downgrade "ppm" typography from `titleLarge` to **`titleMedium`**.
+- **MetricsGrid**:
+    - Establish hierarchy: Increase the weight of the "Gas Level" card and slightly diminish the "System Temp" card's visual weight (e.g., smaller icon or subtler text).
+    - Tighten `Arrangement.spacedBy` to **12dp** for a more compact, tool-like feel.
+
+### 3. Authentication Screens
+
+#### [MODIFY] [LoginScreen.kt](file:///Users/michaelangelotorre/StudioProjects/ScentGuard_new/app/src/main/java/com/example/scentguard/ui/screens/login/LoginScreen.kt) & [SignUpScreen.kt](file:///Users/michaelangelotorre/StudioProjects/ScentGuard_new/app/src/main/java/com/example/scentguard/ui/screens/signup/SignUpScreen.kt)
+- Replace the multi-tone vertical gradient with a solid `SoftMint` background.
+- Rely on the white card surface and subtle borders to create depth.
+- Ensure the tagline "DETECT. VENTILATE. PROTECT." is clean and non-decorative.
 
 ## Verification Plan
 
 ### Automated Tests
-- Build and run `app:compileDebugKotlin` to verify the new configuration structure and layout logic.
+- Run `app:compileDebugKotlin` to ensure no component reference regressions.
 
 ### Manual Verification
-1. **Screen Size Audit**:
-    - Test on a standard device (e.g., Pixel 7) and a smaller device (e.g., Pixel 3a or custom small emulator).
-    - **Criteria**: No scrollbars, no "cut off" buttons, and the bottom "Sign Up/In" footer must be fully visible.
-2. **Visual Polish**:
-    - Verify the gradient fills the entire screen.
-    - Confirm the card has a "floating" premium feel with consistent rounded corners.
-3. **Interactive Test**:
-    - Verify all tap targets (fields, buttons) function correctly without UI jitter.
+1. **Motion Audit**: Confirm the Dashboard no longer has "always-on" animations.
+2. **Rounding Audit**: Check that all cards (Dashboard, Auth, History) use the new, tighter radii consistently.
+3. **State Check**: Simulate SAFE, WARN, and DANGER states; ensure the color transitions are the primary driver of status communication.
+4. **Accessibilty**: Verify that the removal of gradients improves text contrast on the background surfaces.

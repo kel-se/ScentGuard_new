@@ -29,10 +29,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import com.example.scentguard.data.model.UserProfile
 import com.example.scentguard.data.model.MascotAvatars
 import com.example.scentguard.navigation.Screen
-import com.example.scentguard.ui.components.ScentGuardFanControl
-import com.example.scentguard.ui.components.ScentGuardFloatingNav
-import com.example.scentguard.ui.components.ScentGuardNavigationDrawer
-import com.example.scentguard.ui.components.ScentGuardMascotAvatar
+import com.example.scentguard.ui.components.*
 import com.example.scentguard.utils.Resource
 import com.example.scentguard.utils.isScrollingUp
 import com.example.scentguard.viewmodel.MainViewModel
@@ -305,26 +302,6 @@ fun AirQualityHero(
     onViewAnalytics: () -> Unit,
     onCriticalAction: () -> Unit
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "aura")
-    val auraScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.15f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2500, easing = EaseInOutSine), // Slower breathing
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "scale"
-    )
-    val auraAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.05f,
-        targetValue = 0.2f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2500, easing = EaseInOutSine),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "alpha"
-    )
-
     val statusText = remember(gasLevel, airStatus) {
         if (gasLevel == 0) "Standby" else airStatus.uppercase()
     }
@@ -342,79 +319,79 @@ fun AirQualityHero(
     Surface(
         onClick = onViewAnalytics,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(32.dp),
+        shape = RoundedCornerShape(24.dp), // Intentional rounding
         color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
     ) {
         Column(
-            modifier = Modifier.padding(vertical = 40.dp, horizontal = 28.dp), // Taller card
+            modifier = Modifier.padding(vertical = 32.dp, horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                "Current Air Quality",
-                style = MaterialTheme.typography.titleMedium,
+                "CURRENT AIR QUALITY",
+                style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                letterSpacing = 1.sp
             )
             
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(32.dp))
             
             Box(contentAlignment = Alignment.Center) {
-                // Breathing Aura
+                // Static State Indicator
                 Box(
                     modifier = Modifier
                         .size(160.dp)
-                        .scale(auraScale)
-                        .background(statusColor.copy(alpha = auraAlpha), CircleShape)
+                        .background(statusColor.copy(alpha = 0.05f), CircleShape)
                 )
 
                 CircularProgressIndicator(
-                    progress = { (gasLevel / 2000f).coerceIn(0f, 1f) }, // Scale to 2000ppm
-                    modifier = Modifier.size(200.dp),
+                    progress = { (gasLevel / 2000f).coerceIn(0f, 1f) },
+                    modifier = Modifier.size(180.dp),
                     color = statusColor,
-                    strokeWidth = 12.dp,
-                    trackColor = statusColor.copy(alpha = 0.05f),
+                    strokeWidth = 8.dp,
+                    trackColor = statusColor.copy(alpha = 0.1f),
                     strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
                 )
                 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = statusText,
-                        style = MaterialTheme.typography.displayLarge,
+                        style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Black,
                         color = statusColor,
-                        letterSpacing = (-2).sp
+                        letterSpacing = (-1).sp
                     )
                     Text(
                         text = "$gasLevel ppm",
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
             
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(32.dp))
             
             Surface(
                 modifier = Modifier.clickable(enabled = airStatus.uppercase() == "DANGER") {
                     onCriticalAction()
                 },
-                color = statusColor.copy(alpha = 0.05f),
-                shape = CircleShape,
-                border = androidx.compose.foundation.BorderStroke(1.dp, statusColor.copy(alpha = 0.1f))
+                color = statusColor.copy(alpha = 0.08f),
+                shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, statusColor.copy(alpha = 0.15f))
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         if (gasLevel == 0) Icons.Outlined.PowerSettingsNew else if (airStatus.uppercase() != "DANGER") Icons.Outlined.CheckCircle else Icons.Outlined.Warning,
                         null, 
                         tint = statusColor, 
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(16.dp)
                     )
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = if (gasLevel == 0) "Awaiting sensor data" else if (airStatus.uppercase() != "DANGER") "Optimized ventilation" else "Immediate action required",
                         style = MaterialTheme.typography.labelLarge,
@@ -435,37 +412,43 @@ fun MetricsGrid(
     pumpStatus: String = "OFF",
     onPumpClick: () -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
-            "Hardware Status",
-            style = MaterialTheme.typography.titleLarge,
+            "HARDWARE STATUS",
+            style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+            letterSpacing = 1.sp,
             modifier = Modifier.padding(bottom = 4.dp)
         )
         
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            MetricCard(
-                label = "System Temp",
-                value = String.format(java.util.Locale.getDefault(), "%.1f", temp),
-                unit = "°C",
-                icon = Icons.Outlined.Thermostat,
-                modifier = Modifier.weight(1f)
-            )
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             MetricCard(
                 label = "Gas Level",
                 value = gasLevel.toString(),
                 unit = "ppm",
                 icon = Icons.Outlined.Cloud,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1.2f), // More weight to primary metric
+                valueStyle = MaterialTheme.typography.headlineLarge
+            )
+            MetricCard(
+                label = "System Temp",
+                value = String.format(java.util.Locale.getDefault(), "%.1f", temp),
+                unit = "°C",
+                icon = Icons.Outlined.Thermostat,
+                modifier = Modifier.weight(0.8f), // Less weight to secondary
+                valueStyle = MaterialTheme.typography.headlineSmall,
+                iconSize = 16.dp
             )
             if (isWideScreen) {
                 MetricCard(
-                    label = "Sanitation Pump",
+                    label = "Pump",
                     value = if (pumpStatus == "ON") "Spraying" else "Standby",
                     unit = "",
                     icon = Icons.Outlined.Opacity,
                     modifier = Modifier.weight(1f).clickable { onPumpClick() },
-                    valueColor = if (pumpStatus == "ON") Color(0xFF34C759) else MaterialTheme.colorScheme.onSurfaceVariant
+                    valueColor = if (pumpStatus == "ON") Color(0xFF34C759) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    valueStyle = MaterialTheme.typography.headlineSmall
                 )
             }
         }
@@ -491,31 +474,32 @@ fun MetricCard(
     unit: String, 
     icon: ImageVector, 
     modifier: Modifier = Modifier,
-    valueStyle: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.displayLarge,
-    valueColor: Color = MaterialTheme.colorScheme.onSurface
+    valueStyle: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.headlineLarge,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface,
+    iconSize: androidx.compose.ui.unit.Dp = 20.dp
 ) {
-    Surface(
+    ScentGuardCard(
         modifier = modifier,
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+        cornerRadius = 16.dp, // Consistent rounding
+        contentPadding = 16.dp
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column {
             Surface(
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.size(40.dp)
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.size(32.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    Icon(icon, null, tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f), modifier = Modifier.size(iconSize))
                 }
             }
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = label, 
-                style = MaterialTheme.typography.labelLarge, 
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                fontWeight = FontWeight.Bold
+                text = label.uppercase(), 
+                style = MaterialTheme.typography.labelSmall, 
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.5.sp
             )
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
@@ -523,13 +507,13 @@ fun MetricCard(
                     style = valueStyle, 
                     fontWeight = FontWeight.Black, 
                     color = valueColor,
-                    letterSpacing = (-1).sp
+                    letterSpacing = (-0.5).sp
                 )
                 if (unit.isNotEmpty()) {
                     Text(
                         text = unit, 
-                        style = MaterialTheme.typography.titleMedium, 
-                        modifier = Modifier.padding(start = 4.dp, bottom = 8.dp), 
+                        style = MaterialTheme.typography.labelLarge, 
+                        modifier = Modifier.padding(start = 2.dp, bottom = 4.dp), 
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                         fontWeight = FontWeight.Bold
                     )

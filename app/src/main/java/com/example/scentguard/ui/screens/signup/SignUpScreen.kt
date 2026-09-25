@@ -117,41 +117,43 @@ fun SignUpScreen(
             snackbarHost = { SnackbarHost(snackbarHostState) },
             containerColor = Color.Transparent
         ) { padding ->
-            Box(
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(Color(0xFFF0F9F1), Color.White, SoftMint)
-                        )
-                    )
+                    .background(AuthUIConfig.BackgroundColor)
                     .padding(padding)
             ) {
+                val screenHeight = maxHeight
+                val isSmallScreen = screenHeight < 750.dp
+                
                 Column(
                     modifier = Modifier.fillMaxSize(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
+                    // --- Brand Section ---
                     Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(if (isSmallScreen) 0.25f else 0.3f),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(top = 16.dp)
+                        verticalArrangement = Arrangement.Center
                     ) {
                         Text(
                             text = "Smarter Air.\nSafer Spaces.",
-                            style = MaterialTheme.typography.displaySmall,
+                            style = if (isSmallScreen) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.displaySmall,
                             fontWeight = FontWeight.Black,
                             color = MaterialTheme.colorScheme.primary,
                             textAlign = TextAlign.Center,
-                            lineHeight = 36.sp,
-                            letterSpacing = (-1).sp
+                            lineHeight = if (isSmallScreen) 32.sp else 36.sp
                         )
 
                         Text(
-                            text = "DETECT. VENTILATE. PROTECT.",
+                            text = "Detect. Ventilate. Protect.",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
                             fontWeight = FontWeight.Bold,
-                            letterSpacing = 2.sp,
+                            letterSpacing = AuthUIConfig.TaglineLetterSpacing,
                             modifier = Modifier.padding(top = 4.dp)
                         )
                         

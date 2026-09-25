@@ -1,32 +1,26 @@
 package com.example.scentguard.ui.theme
 
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 object AuthUIConfig {
-    // --- Colors & Gradients ---
-    val BackgroundGradient = Brush.verticalGradient(
-        colors = listOf(
-            Color(0xFFF0F9F1), // Very light mint/white
-            Color(0xFFFFFFFF),  // Pure white transition
-            Color(0xFFE8F5E9)   // SoftMint
-        )
-    )
+    // --- Colors ---
+    val BackgroundColor = Color(0xFFE8F5E9) // SoftMint solid background
+    val HeadlineTextColor = Color(0xFF1C1C1E)
     
     val CardBackground = Color.White
     val FieldContainerColor = Color(0xFFF2F2F7).copy(alpha = 0.3f)
     
     // --- Spacing & Sizing ---
     val BrandTopPadding = 32.dp
-    val TaglineLetterSpacing = 2.sp
+    val TaglineLetterSpacing = 1.sp // Reduced for better readability
     
-    val CardCornerRadius = 40.dp
-    val CardElevation = 12.dp
+    val CardCornerRadius = 24.dp // Reduced for professional feel
+    val CardElevation = 4.dp // Subtle shadow
     val CardInternalPadding = 28.dp
     
-    val FieldCornerRadius = 20.dp
+    val FieldCornerRadius = 12.dp // Reduced rounding
     val FieldHeight = 56.dp
     val SmallFieldHeight = 52.dp // Used for Sign-Up to save space
     

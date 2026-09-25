@@ -3,10 +3,8 @@ package com.example.scentguard.ui.screens.login
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -27,7 +25,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.airbnb.lottie.compose.*
@@ -119,7 +119,7 @@ fun LoginScreen(
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(AuthUIConfig.BackgroundGradient)
+                    .background(AuthUIConfig.BackgroundColor)
                     .padding(padding)
             ) {
                 val screenHeight = maxHeight
@@ -143,12 +143,11 @@ fun LoginScreen(
                             fontWeight = FontWeight.Black,
                             color = MaterialTheme.colorScheme.primary,
                             textAlign = TextAlign.Center,
-                            lineHeight = if (isSmallScreen) 34.sp else 40.sp,
-                            letterSpacing = (-1).sp
+                            lineHeight = if (isSmallScreen) 34.sp else 40.sp
                         )
 
                         Text(
-                            text = "DETECT. VENTILATE. PROTECT.",
+                            text = "Detect. Ventilate. Protect.",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
                             fontWeight = FontWeight.Bold,
@@ -190,7 +189,7 @@ fun LoginScreen(
                                 Text(
                                     text = "Welcome back",
                                     style = if (isSmallScreen) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.headlineMedium,
-                                    color = MaterialTheme.colorScheme.onBackground,
+                                    color = AuthUIConfig.HeadlineTextColor,
                                     fontWeight = FontWeight.Black,
                                     letterSpacing = (-0.5).sp
                                 )
@@ -205,10 +204,16 @@ fun LoginScreen(
                                 OutlinedTextField(
                                     value = email,
                                     onValueChange = { email = it },
-                                    label = { Text("Email Address") },
-                                    modifier = Modifier.fillMaxWidth().height(AuthUIConfig.FieldHeight),
+                                    placeholder = { Text("Email Address") },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(AuthUIConfig.FieldHeight),
                                     shape = RoundedCornerShape(AuthUIConfig.FieldCornerRadius),
                                     singleLine = true,
+                                    textStyle = LocalTextStyle.current.copy(
+                                        fontSize = 15.sp,
+                                        lineHeight = 20.sp
+                                    ),
                                     keyboardOptions = KeyboardOptions(
                                         keyboardType = KeyboardType.Email,
                                         autoCorrectEnabled = false
@@ -226,7 +231,7 @@ fun LoginScreen(
                                 OutlinedTextField(
                                     value = password,
                                     onValueChange = { password = it },
-                                    label = { Text("Password") },
+                                    placeholder = { Text("Password") },
                                     visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                                     trailingIcon = {
                                         val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
@@ -234,9 +239,15 @@ fun LoginScreen(
                                             Icon(imageVector = image, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
                                     },
-                                    modifier = Modifier.fillMaxWidth().height(AuthUIConfig.FieldHeight),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(AuthUIConfig.FieldHeight),
                                     shape = RoundedCornerShape(AuthUIConfig.FieldCornerRadius),
                                     singleLine = true,
+                                    textStyle = LocalTextStyle.current.copy(
+                                        fontSize = 15.sp,
+                                        lineHeight = 20.sp
+                                    ),
                                     colors = OutlinedTextFieldDefaults.colors(
                                         focusedBorderColor = MaterialTheme.colorScheme.primary,
                                         unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
@@ -299,14 +310,20 @@ fun LoginScreen(
                                                 val idToken = googleIdTokenCredential.idToken
                                                 viewModel.signInWithGoogle(idToken, hashedNonce)
                                             } catch (e: GetCredentialException) {
-                                                Log.e("LoginScreen", "Credential failure: ${e.message}", e)
-                                                scope.launch { 
-                                                    snackbarHostState.showSnackbar("Google failure: ${e.type} - ${e.message}") 
+                                                Log.e("LoginScreen", "Credential failure: type=${e.type}, msg=${e.message}", e)
+                                                val userMessage = mapCredentialExceptionToUserMessage(e)
+                                                if (userMessage != null) {
+                                                    scope.launch { 
+                                                        snackbarHostState.showSnackbar(userMessage) 
+                                                    }
                                                 }
                                             } catch (e: Exception) {
                                                 Log.e("LoginScreen", "Unexpected error: ${e.message}", e)
-                                                scope.launch { 
-                                                    snackbarHostState.showSnackbar("Error: ${e.localizedMessage}") 
+                                                val userMessage = mapCredentialExceptionToUserMessage(e)
+                                                if (userMessage != null) {
+                                                    scope.launch { 
+                                                        snackbarHostState.showSnackbar(userMessage) 
+                                                    }
                                                 }
                                             }
                                         }
@@ -347,4 +364,35 @@ fun LoginScreen(
             }
         }
     }
+}
+
+private fun mapCredentialExceptionToUserMessage(exception: Exception): String? {
+    if (exception is GetCredentialException) {
+        val type = exception.type
+        val message = exception.message ?: ""
+        if (exception is NoCredentialException ||
+            type.contains("NO_CREDENTIALS", ignoreCase = true) ||
+            message.contains("No credentials available", ignoreCase = true)
+        ) {
+            return "No Google account is available on this device."
+        }
+        if (exception is GetCredentialCancellationException ||
+            type.contains("CANCELED", ignoreCase = true) ||
+            message.contains("User canceled", ignoreCase = true)
+        ) {
+            return null
+        }
+        return "Google Sign-In failed. Please try again."
+    }
+
+    val msg = exception.localizedMessage ?: exception.message ?: ""
+    if (msg.contains("No credentials available", ignoreCase = true) ||
+        msg.contains("NO_CREDENTIALS", ignoreCase = true)
+    ) {
+        return "No Google account is available on this device."
+    }
+    if (msg.contains("canceled", ignoreCase = true)) {
+        return null
+    }
+    return "Google Sign-In failed. Please try again."
 }
