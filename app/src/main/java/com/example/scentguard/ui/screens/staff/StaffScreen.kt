@@ -35,6 +35,7 @@ import com.example.scentguard.utils.isScrollingUp
 import com.example.scentguard.utils.responsiveContainer
 import com.example.scentguard.utils.shimmerEffect
 import com.example.scentguard.viewmodel.MainViewModel
+import com.example.scentguard.viewmodel.StaffFilterOption
 import com.example.scentguard.viewmodel.StaffViewModel
 import com.example.scentguard.viewmodel.ViewModelFactory
 import kotlinx.coroutines.launch
@@ -52,7 +53,11 @@ fun StaffScreen(
     val userProfileResource by mainViewModel.userProfile.collectAsState()
     val user = (userProfileResource as? Resource.Success)?.data
     
-    val staffState by staffViewModel.staffList.collectAsState()
+    val staffState by staffViewModel.filteredStaffList.collectAsState()
+    val rawStaffState by staffViewModel.staffList.collectAsState()
+    val selectedFilter by staffViewModel.selectedFilter.collectAsState()
+    var showFilterMenu by remember { mutableStateOf(false) }
+
     val restaurantState by staffViewModel.restaurantInfo.collectAsState()
     val isRefreshing by staffViewModel.isRefreshingCode.collectAsState()
     val removalState by staffViewModel.removalState.collectAsState()
@@ -89,7 +94,7 @@ fun StaffScreen(
         AlertDialog(
             onDismissRequest = { userToRemove = null },
             title = { Text("Remove Staff Member", fontWeight = FontWeight.Bold) },
-            text = { Text("Are you sure you want to remove \${userToRemove?.fullName}? They will immediately lose access to this restaurant's data.") },
+            text = { Text("Are you sure you want to remove ${userToRemove?.fullName}? They will immediately lose access to this restaurant's data.") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -174,13 +179,86 @@ fun StaffScreen(
                         )
                     }
 
-                    val staffHeading = if (!user?.restaurantName.isNullOrBlank()) "${user?.restaurantName} Staff" else "Current Staff"
-                    Text(
-                        staffHeading,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val staffHeading = if (!user?.restaurantName.isNullOrBlank()) "${user?.restaurantName} Staff" else "Current Staff"
+                        Text(
+                            text = staffHeading,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Box {
+                            Surface(
+                                onClick = { showFilterMenu = true },
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    width = 0.5.dp,
+                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = selectedFilter.label,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Icon(
+                                        imageVector = Icons.Outlined.ArrowDropDown,
+                                        contentDescription = "Filter Menu",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+
+                            DropdownMenu(
+                                expanded = showFilterMenu,
+                                onDismissRequest = { showFilterMenu = false }
+                            ) {
+                                StaffFilterOption.entries.forEach { option ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                if (option == selectedFilter) {
+                                                    Icon(
+                                                        imageVector = Icons.Outlined.Check,
+                                                        contentDescription = "Selected",
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                } else {
+                                                    Spacer(modifier = Modifier.width(26.dp))
+                                                }
+                                                Text(
+                                                    text = option.label,
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = if (option == selectedFilter) FontWeight.Bold else FontWeight.Normal,
+                                                    color = if (option == selectedFilter) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
+                                        },
+                                        onClick = {
+                                            staffViewModel.setFilter(option)
+                                            showFilterMenu = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
 
                     Box(modifier = Modifier.fillMaxSize()) {
                         when (val state = staffState) {
@@ -188,12 +266,16 @@ fun StaffScreen(
                                 StaffSkeletonList()
                             }
                             is Resource.Success -> {
-                                val staffList = state.data ?: emptyList()
-                                if (staffList.isEmpty()) {
+                                val filteredStaffList = state.data ?: emptyList()
+                                val totalStaffList = (rawStaffState as? Resource.Success)?.data ?: emptyList()
+
+                                if (totalStaffList.isEmpty()) {
                                     EmptyStaffState(user?.restaurantName)
+                                } else if (filteredStaffList.isEmpty() && selectedFilter == StaffFilterOption.RECENTLY_JOINED) {
+                                    EmptyRecentlyJoinedState(onResetFilter = { staffViewModel.setFilter(StaffFilterOption.LAST_JOINED) })
                                 } else {
                                     StaffList(
-                                        staff = staffList,
+                                        staff = filteredStaffList,
                                         lazyListState = lazyListState,
                                         onRemove = { member -> userToRemove = member },
                                         currentUserRole = user?.role ?: ""
@@ -435,6 +517,45 @@ fun EmptyStaffState(restaurantName: String?) {
                 fontWeight = FontWeight.Bold
             )
             Text("Share your invite code to add staff", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+        }
+    }
+}
+
+@Composable
+fun EmptyRecentlyJoinedState(onResetFilter: () -> Unit) {
+    Box(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                imageVector = Icons.Outlined.Schedule,
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "No staff joined in the last 30 days.",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Switch back to see all team members.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            TextButton(onClick = onResetFilter) {
+                Text(
+                    text = "Show Last Joined",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
         }
     }
 }

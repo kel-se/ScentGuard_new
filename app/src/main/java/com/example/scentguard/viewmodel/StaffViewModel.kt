@@ -7,11 +7,15 @@ import com.example.scentguard.data.model.UserProfile
 import com.example.scentguard.data.repository.UserRepository
 import com.example.scentguard.utils.Resource
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
+
+enum class StaffFilterOption(val label: String) {
+    LAST_JOINED("Last Joined"),
+    RECENTLY_JOINED("Recently Joined")
+}
 
 class StaffViewModel(
     private val userRepository: UserRepository
@@ -19,6 +23,22 @@ class StaffViewModel(
 
     private val _staffList = MutableStateFlow<Resource<List<UserProfile>>>(Resource.Idle())
     val staffList: StateFlow<Resource<List<UserProfile>>> = _staffList
+
+    private val _selectedFilter = MutableStateFlow(StaffFilterOption.LAST_JOINED)
+    val selectedFilter: StateFlow<StaffFilterOption> = _selectedFilter.asStateFlow()
+
+    val filteredStaffList: StateFlow<Resource<List<UserProfile>>> = combine(_staffList, _selectedFilter) { resource, filter ->
+        when (resource) {
+            is Resource.Success -> {
+                val list = resource.data ?: emptyList()
+                val filtered = applyFilterAndSort(list, filter)
+                Resource.Success(filtered)
+            }
+            is Resource.Loading -> Resource.Loading()
+            is Resource.Error -> Resource.Error(resource.message ?: "Failed to fetch staff")
+            is Resource.Idle -> Resource.Idle()
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), Resource.Idle())
 
     private val _restaurantInfo = MutableStateFlow<Resource<Restaurant>>(Resource.Idle())
     val restaurantInfo: StateFlow<Resource<Restaurant>> = _restaurantInfo
@@ -34,6 +54,45 @@ class StaffViewModel(
 
     init {
         startTimer()
+    }
+
+    fun setFilter(option: StaffFilterOption) {
+        _selectedFilter.value = option
+    }
+
+    private fun applyFilterAndSort(list: List<UserProfile>, filter: StaffFilterOption): List<UserProfile> {
+        val thirtyDaysInMillis = 30L * 24 * 60 * 60 * 1000L
+        val now = System.currentTimeMillis()
+        val thirtyDaysAgo = now - thirtyDaysInMillis
+
+        return when (filter) {
+            StaffFilterOption.LAST_JOINED -> {
+                list.sortedWith(
+                    Comparator { a, b ->
+                        val tA = a.createdAt?.toDate()?.time
+                        val tB = b.createdAt?.toDate()?.time
+                        when {
+                            tA == null && tB == null -> 0
+                            tA == null -> 1  // Null createdAt placed at end
+                            tB == null -> -1 // Null createdAt placed at end
+                            else -> tB.compareTo(tA) // Newest timestamp first
+                        }
+                    }
+                )
+            }
+            StaffFilterOption.RECENTLY_JOINED -> {
+                list.filter { member ->
+                    val time = member.createdAt?.toDate()?.time
+                    time != null && time >= thirtyDaysAgo
+                }.sortedWith(
+                    Comparator { a, b ->
+                        val tA = a.createdAt!!.toDate().time
+                        val tB = b.createdAt!!.toDate().time
+                        tB.compareTo(tA) // Newest timestamp first
+                    }
+                )
+            }
+        }
     }
 
     private fun startTimer() {
