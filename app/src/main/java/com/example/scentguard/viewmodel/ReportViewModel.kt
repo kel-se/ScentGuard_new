@@ -109,11 +109,19 @@ class ReportViewModel(
                 return@launch
             }
 
+            val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+            val dangerThreshold = try {
+                val restDoc = db.collection("restaurants").document(rid).get().await()
+                (restDoc.getLong("thresholdDanger") ?: 1500L).toFloat()
+            } catch (e: Exception) {
+                1500f
+            }
+
             // 1. Average Gas
             val avgGas = points.map { it.y }.average().toInt()
 
-            // 2. Total Alerts
-            val dangerSnapshots = points.count { it.y >= 1500f }
+            // 2. Total Alerts (snapshots reaching or exceeding configured Danger threshold)
+            val dangerSnapshots = points.count { it.y >= dangerThreshold }
             val totalSnapshots = points.size
 
             // 3. Performance Index
@@ -123,7 +131,6 @@ class ReportViewModel(
 
             // 4. Fan Runtime
             var totalMinutes = 0
-            val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
             try {
                 val limit = if (isWeekly) 1000 else 96
                 val snapshot = db.collection("restaurants").document(rid)
