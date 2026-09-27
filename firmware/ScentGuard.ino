@@ -7,6 +7,8 @@
 #include <Preferences.h>
 #include "time.h"
 #include "DHT.h"
+#include "soc/soc.h"
+#include "soc/rtc_cntl_reg.h"
 
 // =====================================================
 // 1. CONFIGURATION
@@ -642,6 +644,7 @@ void uploadHistorySnapshot(
 }
 
 void setup() {
+    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); // Disable brownout detector
     Serial.begin(115200);
 
     // Initialize DHT11
