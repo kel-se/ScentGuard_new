@@ -4,6 +4,7 @@
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
+#include <BLE2902.h>
 #include <Preferences.h>
 #include "time.h"
 #include "DHT.h"
@@ -23,11 +24,12 @@
 #define SSID_CHAR_UUID      "0000FF02-0000-1000-8000-00805F9B34FB"
 #define PASS_CHAR_UUID      "0000FF03-0000-1000-8000-00805F9B34FB"
 #define RID_CHAR_UUID       "0000FF04-0000-1000-8000-00805F9B34FB"
+#define STATUS_CHAR_UUID    "0000FF05-0000-1000-8000-00805F9B34FB"
 
-// Timing (Non-blocking)
+// Timing (Non-blocking - Staggered intervals to prevent SSL/socket contention)
 #define SERIAL_INTERVAL 1500UL
-#define TELEMETRY_INTERVAL 5000UL
-#define CONFIG_INTERVAL 5000UL
+#define TELEMETRY_INTERVAL 6000UL
+#define CONFIG_INTERVAL 10000UL
 #define HISTORY_INTERVAL 60000UL
 #define WIFI_RECOVERY_TIMEOUT 60000UL
 
@@ -51,7 +53,7 @@
 DHT dht(DHT_PIN, DHT_TYPE);
 
 // =====================================================
-// 3. GLOBALS
+// 2. GLOBALS
 // =====================================================
 
 Preferences preferences;
@@ -67,6 +69,8 @@ int thresholdDanger = 1500;
 FirebaseData fbdo_telem, fbdo_config, fbdo_hist;
 FirebaseAuth auth;
 FirebaseConfig config;
+
+BLECharacteristic *pStatusChar = nullptr;
 
 unsigned long lastSerial = 0, lastTelem = 0, lastConfig = 0, lastHist = 0;
 unsigned long wifiLostTime = 0;
@@ -87,7 +91,7 @@ String temperatureStatus = "NORMAL";
 float currentHum = 0.0;
 
 // =====================================================
-// 4. FUNCTIONS
+// 3. FUNCTIONS
 // =====================================================
 
 float readTemperature() {
@@ -104,34 +108,20 @@ float readTemperature() {
 }
 
 void setFan(bool enabled) {
-    digitalWrite(
-            RELAY_CH1_PIN,
-            enabled ? LOW : HIGH
-    );
+    digitalWrite(RELAY_CH1_PIN, enabled ? LOW : HIGH);
     if (isFanPhysicallyActive != enabled) {
         isFanPhysicallyActive = enabled;
         Serial.print("Relay CH1 (Fan): ");
-        Serial.println(
-                enabled ? "ON" : "OFF"
-        );
+        Serial.println(enabled ? "ON" : "OFF");
     }
 }
 
 void setPump(bool enabled) {
-    digitalWrite(
-            RELAY_CH2_PIN,
-            enabled ? LOW : HIGH
-    );
+    digitalWrite(RELAY_CH2_PIN, enabled ? LOW : HIGH);
     if (pumpCurrentlyOn != enabled) {
         pumpCurrentlyOn = enabled;
-        Serial.print(
-                "Relay CH2 (Sanitation Pump): "
-        );
-        Serial.println(
-                enabled
-                ? "ON - SPRAYING"
-                : "OFF - PAUSE"
-        );
+        Serial.print("Relay CH2 (Sanitation Pump): ");
+        Serial.println(enabled ? "ON - SPRAYING" : "OFF - PAUSE");
     }
 }
 
@@ -153,9 +143,7 @@ void startSanitation() {
     lastSprayChangeTime = millis();
     sanitationCycleCount = 1;
     setPump(true);
-    Serial.println(
-            "Sanitation Spray #1 STARTED"
-    );
+    Serial.println("Sanitation Spray #1 STARTED");
 }
 
 void stopSanitation() {
@@ -174,473 +162,237 @@ void updateSanitation() {
         return;
     }
     unsigned long now = millis();
-    if (
-            now - sanitationStartTime >= SANITATION_DURATION
-            ) {
+    if (now - sanitationStartTime >= SANITATION_DURATION) {
         stopSanitation();
         return;
     }
     if (pumpCurrentlyOn) {
-        if (
-                now - lastSprayChangeTime >= SPRAY_ON_TIME
-                ) {
+        if (now - lastSprayChangeTime >= SPRAY_ON_TIME) {
             setPump(false);
             lastSprayChangeTime = now;
-            Serial.print(
-                    "Spray #"
-            );
-            Serial.print(
-                    sanitationCycleCount
-            );
-            Serial.println(
-                    " completed - 2 sec pause"
-            );
+            Serial.print("Spray #");
+            Serial.print(sanitationCycleCount);
+            Serial.println(" completed - 2 sec pause");
         }
-    }
-    else {
-        if (
-                now - lastSprayChangeTime >= SPRAY_OFF_TIME
-                ) {
-            if (
-                    sanitationCycleCount >= SANITATION_CYCLES
-                    ) {
+    } else {
+        if (now - lastSprayChangeTime >= SPRAY_OFF_TIME) {
+            if (sanitationCycleCount >= SANITATION_CYCLES) {
                 stopSanitation();
                 return;
             }
             sanitationCycleCount++;
             setPump(true);
             lastSprayChangeTime = now;
-            Serial.print(
-                    "Sanitation Spray #"
-            );
-            Serial.print(
-                    sanitationCycleCount
-            );
-            Serial.println(
-                    " STARTED - 3 sec"
-            );
+            Serial.print("Sanitation Spray #");
+            Serial.print(sanitationCycleCount);
+            Serial.println(" STARTED - 3 sec");
         }
     }
 }
 
+class MyServerCallbacks : public BLEServerCallbacks {
+    void onConnect(BLEServer* pServer) {
+        Serial.println("BLE Client Connected");
+    }
+    void onDisconnect(BLEServer* pServer) {
+        Serial.println("BLE Client Disconnected.");
+    }
+};
+
 class MyCallbacks : public BLECharacteristicCallbacks {
-    void onWrite(
-            BLECharacteristic *pCharacteristic
-    ) {
-        String value =
-                String(
-                        pCharacteristic
-                                ->getValue()
-                                .c_str()
-                );
-        String uuid =
-                pCharacteristic
-                        ->getUUID()
-                        .toString();
-        if (
-                uuid.equalsIgnoreCase(
-                        SSID_CHAR_UUID
-                )
-                ) {
+    void onWrite(BLECharacteristic *pCharacteristic) {
+        String value = String(pCharacteristic->getValue().c_str());
+        String uuid = pCharacteristic->getUUID().toString();
+        if (uuid.equalsIgnoreCase(SSID_CHAR_UUID)) {
             receivedSSID = value;
             receivedSSID.trim();
-            Serial.print(
-                    "BLE: SSID Received: "
-            );
-            Serial.println(
-                    receivedSSID
-            );
-        }
-        else if (
-                uuid.equalsIgnoreCase(
-                        PASS_CHAR_UUID
-                )
-                ) {
+            Serial.print("BLE: SSID Received: ");
+            Serial.println(receivedSSID);
+        } else if (uuid.equalsIgnoreCase(PASS_CHAR_UUID)) {
             receivedPASS = value;
             receivedPASS.trim();
-            Serial.println(
-                    "BLE: Password Received (Hidden)"
-            );
-        }
-        else if (
-                uuid.equalsIgnoreCase(
-                        RID_CHAR_UUID
-                )
-                ) {
+            Serial.println("BLE: Password Received (Hidden)");
+        } else if (uuid.equalsIgnoreCase(RID_CHAR_UUID)) {
             receivedRID = value;
             receivedRID.trim();
-            Serial.print(
-                    "BLE: Restaurant ID Received: "
-            );
-            Serial.println(
-                    receivedRID
-            );
+            Serial.print("BLE: Restaurant ID Received: ");
+            Serial.println(receivedRID);
         }
     }
 };
 
-void startProvisioning() {
-    isProvisioning = true;
-    Serial.println(
-            "\nStarting BLE Setup Mode (ScentGuard-ESP32)"
+void initBLE() {
+    Serial.println("\nInitializing BLE Server (ScentGuard-ESP32)...");
+    BLEDevice::init("ScentGuard-ESP32");
+    BLEServer *pServer = BLEDevice::createServer();
+    pServer->setCallbacks(new MyServerCallbacks());
+    BLEService *pService = pServer->createService(SERVICE_UUID);
+
+    BLECharacteristic *pSSID = pService->createCharacteristic(
+            SSID_CHAR_UUID,
+            BLECharacteristic::PROPERTY_WRITE
     );
-    BLEDevice::init(
-            "ScentGuard-ESP32"
+    BLECharacteristic *pPASS = pService->createCharacteristic(
+            PASS_CHAR_UUID,
+            BLECharacteristic::PROPERTY_WRITE
     );
-    BLEServer *pServer =
-            BLEDevice::createServer();
-    BLEService *pService =
-            pServer->createService(
-                    SERVICE_UUID
-            );
-    BLECharacteristic *pSSID =
-            pService->createCharacteristic(
-                    SSID_CHAR_UUID,
-                    BLECharacteristic::PROPERTY_WRITE
-            );
-    BLECharacteristic *pPASS =
-            pService->createCharacteristic(
-                    PASS_CHAR_UUID,
-                    BLECharacteristic::PROPERTY_WRITE
-            );
-    BLECharacteristic *pRID =
-            pService->createCharacteristic(
-                    RID_CHAR_UUID,
-                    BLECharacteristic::PROPERTY_WRITE
-            );
-    pSSID->setCallbacks(
-            new MyCallbacks()
+    BLECharacteristic *pRID = pService->createCharacteristic(
+            RID_CHAR_UUID,
+            BLECharacteristic::PROPERTY_WRITE
     );
-    pPASS->setCallbacks(
-            new MyCallbacks()
+    pStatusChar = pService->createCharacteristic(
+            STATUS_CHAR_UUID,
+            BLECharacteristic::PROPERTY_NOTIFY
     );
-    pRID->setCallbacks(
-            new MyCallbacks()
-    );
+    pStatusChar->addDescriptor(new BLE2902());
+
+    pSSID->setCallbacks(new MyCallbacks());
+    pPASS->setCallbacks(new MyCallbacks());
+    pRID->setCallbacks(new MyCallbacks());
+
     pService->start();
-    BLEAdvertising *pAdvertising =
-            BLEDevice::getAdvertising();
-    pAdvertising->addServiceUUID(
-            SERVICE_UUID
-    );
-    pAdvertising->setScanResponse(
-            true
-    );
+    BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+    pAdvertising->addServiceUUID(SERVICE_UUID);
+    pAdvertising->setScanResponse(true);
     pAdvertising->start();
-    Serial.println(
-            "Waiting for App connection..."
-    );
+    Serial.println("BLE Advertising Started. Ready for connection / Quick Re-bind.");
 }
 
 bool loadCredentials() {
-    preferences.begin(
-            "scentguard",
-            true
-    );
-    String ssid =
-            preferences.getString(
-                    "ssid",
-                    ""
-            );
-    String pass =
-            preferences.getString(
-                    "pass",
-                    ""
-            );
-    activeRestaurantId =
-            preferences.getString(
-                    "rid",
-                    ""
-            );
+    preferences.begin("scentguard", true);
+    String ssid = preferences.getString("ssid", "");
+    String pass = preferences.getString("pass", "");
+    activeRestaurantId = preferences.getString("rid", "");
     preferences.end();
-    if (
-            ssid == "" ||
-            activeRestaurantId == ""
-            ) {
+    if (ssid == "" || activeRestaurantId == "") {
         return false;
     }
-    Serial.println(
-            "\nCredentials loaded. Connecting to: "
-            + ssid
-    );
-    WiFi.begin(
-            ssid.c_str(),
-            pass.c_str()
-    );
-    unsigned long start =
-            millis();
-    while (
-            WiFi.status() != WL_CONNECTED &&
-            millis() - start < 15000
-            ) {
+    Serial.println("\nCredentials loaded. Connecting to: " + ssid);
+    WiFi.begin(ssid.c_str(), pass.c_str());
+    unsigned long start = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - start < 15000) {
         delay(500);
         Serial.print(".");
     }
-    return (
-            WiFi.status() ==
-            WL_CONNECTED
-    );
+    return (WiFi.status() == WL_CONNECTED);
 }
 
 String getTimestamp() {
-    time_t now =
-            time(nullptr);
-    if (
-            now < 100000
-            ) {
+    time_t now = time(nullptr);
+    if (now < 100000) {
         return "";
     }
     struct tm timeinfo;
-    gmtime_r(
-            &now,
-            &timeinfo
-    );
+    gmtime_r(&now, &timeinfo);
     char timestamp[32];
-    strftime(
-            timestamp,
-            sizeof(timestamp),
-            "%Y-%m-%dT%H:%M:%SZ",
-            &timeinfo
-    );
-    return String(
-            timestamp
-    );
+    strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
+    return String(timestamp);
 }
 
 String getSlotID() {
     struct tm timeinfo;
-    if (
-            !getLocalTime(
-                    &timeinfo
-            )
-            ) {
-        return (
-                "snap_" +
-                String(millis())
-        );
+    if (!getLocalTime(&timeinfo)) {
+        return ("snap_" + String(millis()));
     }
-    int slotMin =
-            (timeinfo.tm_min / 15) * 15;
+    int slotMin = (timeinfo.tm_min / 15) * 15;
     char buf[32];
-    strftime(
-            buf,
-            sizeof(buf),
-            "snap_%Y%m%d_%H",
-            &timeinfo
-    );
-    String id =
-            String(buf);
-    if (
-            slotMin < 10
-            ) {
+    strftime(buf, sizeof(buf), "snap_%Y%m%d_%H", &timeinfo);
+    String id = String(buf);
+    if (slotMin < 10) {
         id += "0";
     }
-    id += String(
-            slotMin
-    );
+    id += String(slotMin);
     return id;
 }
 
 void syncTime() {
-    configTime(
-            0,
-            0,
-            "pool.ntp.org",
-            "time.nist.gov"
-    );
-    Serial.print(
-            "Syncing Time"
-    );
-    time_t now =
-            time(nullptr);
-    while (
-            now < 8 * 3600 * 2
-            ) {
+    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+    Serial.print("Syncing Time");
+    time_t now = time(nullptr);
+    while (now < 8 * 3600 * 2) {
         delay(500);
         Serial.print(".");
-        now =
-                time(nullptr);
+        now = time(nullptr);
     }
-    Serial.println(
-            "\nTime OK!"
-    );
+    Serial.println("\nTime OK!");
 }
 
 void readRemoteConfig() {
-    String path =
-            "restaurants/" +
-            activeRestaurantId;
-    if (
-            Firebase.Firestore.getDocument(
-                    &fbdo_config,
-                    PROJECT_ID,
-                    "",
-                    path.c_str(),
-                    "fanMode,thresholdWarn,thresholdDanger"
-            )
-            ) {
+    String path = "restaurants/" + activeRestaurantId;
+    if (Firebase.Firestore.getDocument(&fbdo_config, PROJECT_ID, "", path.c_str(), "fanMode,thresholdWarn,thresholdDanger")) {
         FirebaseJson json;
         FirebaseJsonData res;
-        json.setJsonData(
-                fbdo_config.payload()
-        );
-        if (
-                json.get(
-                        res,
-                        "fields/fanMode/stringValue"
-                )
-                ) {
-            currentFanMode =
-                    res.stringValue;
+        json.setJsonData(fbdo_config.payload());
+
+        String tempFanMode = currentFanMode;
+        int tempWarn = thresholdWarn;
+        int tempDanger = thresholdDanger;
+        bool updated = false;
+
+        if (json.get(res, "fields/fanMode/stringValue")) {
+            tempFanMode = res.stringValue;
+            updated = true;
         }
-        if (
-                json.get(
-                        res,
-                        "fields/thresholdWarn/integerValue"
-                )
-                ) {
-            thresholdWarn =
-                    (int)res.intValue;
+        if (json.get(res, "fields/thresholdWarn/integerValue")) {
+            tempWarn = (int)res.intValue;
+            updated = true;
         }
-        if (
-                json.get(
-                        res,
-                        "fields/thresholdDanger/integerValue"
-                )
-                ) {
-            thresholdDanger =
-                    (int)res.intValue;
+        if (json.get(res, "fields/thresholdDanger/integerValue")) {
+            tempDanger = (int)res.intValue;
+            updated = true;
         }
-        Serial.printf(
-                ">> Sync [RID:%s]: Mode=%s, Warn=%d, Danger=%d\n",
-                activeRestaurantId.c_str(),
-                currentFanMode.c_str(),
-                thresholdWarn,
-                thresholdDanger
-        );
+
+        if (updated) {
+            currentFanMode = tempFanMode;
+            thresholdWarn = tempWarn;
+            thresholdDanger = tempDanger;
+            Serial.printf(">> Sync [RID:%s]: Mode=%s, Warn=%d, Danger=%d\n", activeRestaurantId.c_str(), currentFanMode.c_str(), thresholdWarn, thresholdDanger);
+        }
+    } else {
+        Serial.printf(">> Sync FAILED (Retaining last known config): %s\n", fbdo_config.errorReason().c_str());
     }
+    fbdo_config.clear();
 }
 
-void uploadTelemetry(
-        int gasValue,
-        String airStatus
-) {
+void uploadTelemetry(int gasValue, String airStatus) {
     FirebaseJson content;
-    content.set(
-            "fields/currentGasPpm/integerValue",
-            gasValue
-    );
-    content.set(
-            "fields/airStatus/stringValue",
-            airStatus
-    );
-    content.set(
-            "fields/fanStatus/stringValue",
-            isFanPhysicallyActive
-            ? "ON"
-            : "OFF"
-    );
-    content.set(
-            "fields/temperature/doubleValue",
-            temperature
-    );
-    String ts =
-            getTimestamp();
-    if (
-            ts != ""
-            ) {
-        content.set(
-                "fields/lastSeen/timestampValue",
-                ts
-        );
+    content.set("fields/currentGasPpm/integerValue", gasValue);
+    content.set("fields/airStatus/stringValue", airStatus);
+    content.set("fields/fanStatus/stringValue", isFanPhysicallyActive ? "ON" : "OFF");
+    content.set("fields/temperature/doubleValue", temperature);
+    String ts = getTimestamp();
+    if (ts != "") {
+        content.set("fields/lastSeen/timestampValue", ts);
     }
-    String path =
-            "restaurants/" +
-            activeRestaurantId;
-    if (
-            Firebase.Firestore.patchDocument(
-                    &fbdo_telem,
-                    PROJECT_ID,
-                    "",
-                    path.c_str(),
-                    content.raw(),
-                    "currentGasPpm,airStatus,fanStatus,lastSeen,temperature"
-            )
-            ) {
-        Serial.println(
-                ">> Telemetry OK"
-        );
+    String path = "restaurants/" + activeRestaurantId;
+    if (Firebase.Firestore.patchDocument(&fbdo_telem, PROJECT_ID, "", path.c_str(), content.raw(), "currentGasPpm,airStatus,fanStatus,lastSeen,temperature")) {
+        Serial.println(">> Telemetry OK");
+    } else {
+        Serial.println(">> Telemetry FAILED: " + fbdo_telem.errorReason());
     }
+    fbdo_telem.clear();
 }
 
-void uploadHistorySnapshot(
-        int gasValue,
-        String airStatus
-) {
-    Serial.println(
-            ">> UPLOADING HISTORY SNAPSHOT..."
-    );
+void uploadHistorySnapshot(int gasValue, String airStatus) {
+    Serial.println(">> UPLOADING HISTORY SNAPSHOT...");
     FirebaseJson content;
-    content.set(
-            "fields/currentGasPpm/integerValue",
-            gasValue
-    );
-    content.set(
-            "fields/airStatus/stringValue",
-            airStatus
-    );
-    content.set(
-            "fields/fanStatus/stringValue",
-            isFanPhysicallyActive
-            ? "ON"
-            : "OFF"
-    );
-    content.set(
-            "fields/fanMode/stringValue",
-            currentFanMode
-    );
-    content.set(
-            "fields/temperature/doubleValue",
-            temperature
-    );
-    String ts =
-            getTimestamp();
-    if (
-            ts != ""
-            ) {
-        content.set(
-                "fields/timestamp/timestampValue",
-                ts
-        );
+    content.set("fields/currentGasPpm/integerValue", gasValue);
+    content.set("fields/airStatus/stringValue", airStatus);
+    content.set("fields/fanStatus/stringValue", isFanPhysicallyActive ? "ON" : "OFF");
+    content.set("fields/fanMode/stringValue", currentFanMode);
+    content.set("fields/temperature/doubleValue", temperature);
+    String ts = getTimestamp();
+    if (ts != "") {
+        content.set("fields/timestamp/timestampValue", ts);
     }
-    String slotId =
-            getSlotID();
-    String path =
-            "restaurants/" +
-            activeRestaurantId +
-            "/sensor_history/" +
-            slotId;
-    if (
-            Firebase.Firestore.patchDocument(
-                    &fbdo_hist,
-                    PROJECT_ID,
-                    "",
-                    path.c_str(),
-                    content.raw(),
-                    "currentGasPpm,airStatus,fanStatus,fanMode,timestamp,temperature"
-            )
-            ) {
-        Serial.println(
-                ">> History Snapshot OK: " +
-                slotId
-        );
+    String slotId = getSlotID();
+    String path = "restaurants/" + activeRestaurantId + "/sensor_history/" + slotId;
+    if (Firebase.Firestore.patchDocument(&fbdo_hist, PROJECT_ID, "", path.c_str(), content.raw(), "currentGasPpm,airStatus,fanStatus,fanMode,timestamp,temperature")) {
+        Serial.println(">> History Snapshot OK: " + slotId);
+    } else {
+        Serial.println(">> History Snapshot FAILED: " + fbdo_hist.errorReason());
     }
-    else {
-        Serial.println(
-                ">> History Snapshot FAILED: " +
-                fbdo_hist.errorReason()
-        );
-    }
+    fbdo_hist.clear();
 }
 
 void setup() {
@@ -670,10 +422,19 @@ void setup() {
         }
     }
 
+    initBLE();
+
     if (!loadCredentials()) {
-        startProvisioning();
+        isProvisioning = true;
+        Serial.println("\nNo credentials found. Waiting for provisioning...");
     } else {
         syncTime();
+
+        // Configure SSL buffer sizes to prevent BearSSL heap/write errors
+        fbdo_telem.setBSSLBufferSize(1024, 1024);
+        fbdo_config.setBSSLBufferSize(1024, 1024);
+        fbdo_hist.setBSSLBufferSize(1024, 1024);
+
         config.api_key = API_KEY;
         config.database_url = DATABASE_URL;
         config.token_status_callback = tokenStatusCallback;
@@ -687,34 +448,79 @@ void setup() {
 void loop() {
     unsigned long now = millis();
 
-    if (isProvisioning) {
-        digitalWrite(RED_LED, (now / 500) % 2 == 0);
-        if (receivedSSID != "" && receivedPASS != "" && receivedRID != "") {
-            Serial.println("\nTesting connection...");
+    // Check for Quick Re-bind or Provisioning updates from BLE
+    if (receivedRID != "") {
+        preferences.begin("scentguard", false);
+        String savedSsid = preferences.getString("ssid", "");
+        String savedPass = preferences.getString("pass", "");
+
+        String targetSsid = (receivedSSID != "") ? receivedSSID : savedSsid;
+        String targetPass = (receivedPASS != "") ? receivedPASS : savedPass;
+
+        if (isProvisioning && (targetSsid == "" || targetPass == "")) {
+            Serial.println("\n[BLE] Error: Missing Wi-Fi credentials for initial provisioning.");
+            if (pStatusChar != nullptr) {
+                uint8_t failVal = 2;
+                pStatusChar->setValue(&failVal, 1);
+                pStatusChar->notify();
+            }
+            receivedRID = "";
+            preferences.end();
+            return;
+        }
+
+        if (receivedSSID != "" && receivedPASS != "") {
+            Serial.println("\nTesting Wi-Fi connection...");
             WiFi.disconnect(true);
             delay(1000);
-            WiFi.begin(receivedSSID.c_str(), receivedPASS.c_str());
+            WiFi.begin(targetSsid.c_str(), targetPass.c_str());
             unsigned long start = millis();
             while (WiFi.status() != WL_CONNECTED && millis() - start < 10000) {
                 delay(500);
                 Serial.print(".");
             }
-            if (WiFi.status() == WL_CONNECTED) {
-                preferences.begin("scentguard", false);
-                preferences.putString("ssid", receivedSSID);
-                preferences.putString("pass", receivedPASS);
-                preferences.putString("rid", receivedRID);
-                preferences.end();
-                Serial.println("\nSuccess! Restarting...");
-                delay(2000);
-                ESP.restart();
-            } else {
-                Serial.println("\nFailed. Waiting for new credentials...");
+            if (WiFi.status() != WL_CONNECTED) {
+                Serial.println("\nWi-Fi connection failed. Keeping old credentials.");
+                if (pStatusChar != nullptr) {
+                    uint8_t failVal = 2;
+                    pStatusChar->setValue(&failVal, 1);
+                    pStatusChar->notify();
+                }
                 receivedSSID = "";
                 receivedPASS = "";
                 receivedRID = "";
+                preferences.end();
+                return;
+            } else {
+                Serial.println("\nWi-Fi connection successful.");
+                if (pStatusChar != nullptr) {
+                    uint8_t successVal = 1;
+                    pStatusChar->setValue(&successVal, 1);
+                    pStatusChar->notify();
+                }
+                delay(1500); // Allow app to receive notification and disconnect gracefully
             }
+        } else {
+            if (pStatusChar != nullptr) {
+                uint8_t successVal = 1;
+                pStatusChar->setValue(&successVal, 1);
+                pStatusChar->notify();
+            }
+            delay(1500);
         }
+
+        preferences.putString("ssid", targetSsid);
+        preferences.putString("pass", targetPass);
+        preferences.putString("rid", receivedRID);
+        preferences.end();
+
+        Serial.printf("\n[BLE] Success! Saved Restaurant ID: %s. Restarting...\n", receivedRID.c_str());
+        delay(2000);
+        ESP.restart();
+    }
+
+    if (isProvisioning) {
+        digitalWrite(RED_LED, (now / 500) % 2 == 0);
         return;
     }
 
@@ -765,7 +571,7 @@ void loop() {
         } else if (now - wifiLostTime >= WIFI_RECOVERY_TIMEOUT && !wifiLossHandled) {
             Serial.println("\n[WATCHDOG] Wi-Fi lost for 60s. Entering Recovery (BLE)...");
             wifiLossHandled = true;
-            startProvisioning();
+            isProvisioning = true;
             return;
         }
     } else {
@@ -784,7 +590,7 @@ void loop() {
         Serial.printf("[FIREBASE] %s\n", Firebase.ready() ? "Connected" : "Offline");
     }
 
-    // 6. FIREBASE SYNC (Intervals)
+    // 6. FIREBASE SYNC (Intervals - Staggered to prevent socket contention)
     if (Firebase.ready()) {
         if (now - lastConfig >= CONFIG_INTERVAL) {
             lastConfig = now;
