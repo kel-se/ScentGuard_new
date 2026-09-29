@@ -6,7 +6,10 @@
 #include <BLEServer.h>
 #include <Preferences.h>
 #include "time.h"
-#include "DHT.h"
+
+// ESP32 Brownout Detector Control
+#include "soc/soc.h"
+#include "soc/rtc_cntl_reg.h"
 
 // =====================================================
 // 1. CONFIGURATION
@@ -24,10 +27,11 @@
 
 // Timing (Non-blocking)
 #define SERIAL_INTERVAL 1500UL
-#define TELEMETRY_INTERVAL 5000UL
+#define TELEMETRY_INTERVAL 3000UL
 #define CONFIG_INTERVAL 5000UL
 #define HISTORY_INTERVAL 60000UL
 #define WIFI_RECOVERY_TIMEOUT 60000UL
+#define FAN_DEBOUNCE_TIME 2000UL // Minimum time (ms) before fan can toggle state
 
 #define SPRAY_ON_TIME 3000UL
 #define SPRAY_OFF_TIME 2000UL
@@ -38,13 +42,9 @@
 #define RELAY_CH1_PIN 23
 #define RELAY_CH2_PIN 25
 #define MQ135_PIN 34
-#define DHTPIN 4
 #define GREEN_LED 18
 #define RED_LED 19
 #define BOOT_BUTTON 0
-
-#define DHTTYPE DHT11
-DHT dht(DHTPIN, DHTTYPE);
 
 // =====================================================
 // 3. GLOBALS
@@ -65,6 +65,7 @@ FirebaseAuth auth;
 FirebaseConfig config;
 
 unsigned long lastSerial = 0, lastTelem = 0, lastConfig = 0, lastHist = 0;
+unsigned long lastFanToggleTime = 0;
 unsigned long wifiLostTime = 0;
 bool wifiLossHandled = false;
 
@@ -78,21 +79,21 @@ int sanitationCycleCount = 0;
 bool wasInDanger = false;
 String lastInternalStatus = "SAFE";
 
-float currentTemp = 0.0;
-float currentHum = 0.0;
+float smoothedGasPpm = -1.0;
+
 void setFan(bool enabled) {
-    digitalWrite(
-            RELAY_CH1_PIN,
-            enabled ? LOW : HIGH
-    );
+    // Only toggle if state changes AND minimum debounce interval has elapsed
     if (isFanPhysicallyActive != enabled) {
-        isFanPhysicallyActive = enabled;
-        Serial.print("Relay CH1 (Fan): ");
-        Serial.println(
-                enabled ? "ON" : "OFF"
-        );
+        if (millis() - lastFanToggleTime >= FAN_DEBOUNCE_TIME) {
+            isFanPhysicallyActive = enabled;
+            digitalWrite(RELAY_CH1_PIN, enabled ? LOW : HIGH);
+            lastFanToggleTime = millis();
+            Serial.print("Relay CH1 (Fan): ");
+            Serial.println(enabled ? "ON" : "OFF");
+        }
     }
 }
+
 void setPump(bool enabled) {
     digitalWrite(
             RELAY_CH2_PIN,
@@ -110,6 +111,7 @@ void setPump(bool enabled) {
         );
     }
 }
+
 void startSanitation() {
     if (isSanitationActive) {
         return;
@@ -132,6 +134,7 @@ void startSanitation() {
             "Sanitation Spray #1 STARTED"
     );
 }
+
 void stopSanitation() {
     isSanitationActive = false;
     sanitationCycleCount = 0;
@@ -142,6 +145,7 @@ void stopSanitation() {
     Serial.println("Pump OFF");
     Serial.println("======================================");
 }
+
 void updateSanitation() {
     if (!isSanitationActive) {
         return;
@@ -195,6 +199,7 @@ void updateSanitation() {
         }
     }
 }
+
 class MyCallbacks : public BLECharacteristicCallbacks {
     void onWrite(
             BLECharacteristic *pCharacteristic
@@ -250,6 +255,7 @@ class MyCallbacks : public BLECharacteristicCallbacks {
         }
     }
 };
+
 void startProvisioning() {
     isProvisioning = true;
     Serial.println(
@@ -302,6 +308,7 @@ void startProvisioning() {
             "Waiting for App connection..."
     );
 }
+
 bool loadCredentials() {
     preferences.begin(
             "scentguard",
@@ -351,6 +358,7 @@ bool loadCredentials() {
             WL_CONNECTED
     );
 }
+
 String getTimestamp() {
     time_t now =
             time(nullptr);
@@ -375,6 +383,7 @@ String getTimestamp() {
             timestamp
     );
 }
+
 String getSlotID() {
     struct tm timeinfo;
     if (
@@ -408,6 +417,7 @@ String getSlotID() {
     );
     return id;
 }
+
 void syncTime() {
     configTime(
             0,
@@ -432,6 +442,7 @@ void syncTime() {
             "\nTime OK!"
     );
 }
+
 void readRemoteConfig() {
     String path =
             "restaurants/" +
@@ -486,6 +497,7 @@ void readRemoteConfig() {
         );
     }
 }
+
 void uploadTelemetry(
         int gasValue,
         String airStatus
@@ -533,6 +545,7 @@ void uploadTelemetry(
         );
     }
 }
+
 void uploadHistorySnapshot(
         int gasValue,
         String airStatus
@@ -598,14 +611,15 @@ void uploadHistorySnapshot(
         );
     }
 }
+
 void setup() {
+    // Disable ESP32 Brownout Detector to prevent power-dip resets
+    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
+
     Serial.begin(115200);
 
-    // Initialize DHT11
-    dht.begin();
-
     pinMode(RELAY_CH1_PIN, OUTPUT);
-    digitalWrite(RELAY_CH1_PIN, HIGH);
+    digitalWrite(RELAY_CH1_PIN, HIGH); // Relays are active-low (HIGH = OFF)
     pinMode(RELAY_CH2_PIN, OUTPUT);
     digitalWrite(RELAY_CH2_PIN, HIGH);
     pinMode(GREEN_LED, OUTPUT);
@@ -672,18 +686,36 @@ void loop() {
         return;
     }
 
-    // 1. FAST SENSOR READING (Non-blocking)
-    int gasValue = analogRead(MQ135_PIN);
+    // 1. SENSOR READING WITH EXPONENTIAL SMOOTHING (Filters ADC Noise)
+    int rawGas = analogRead(MQ135_PIN);
+    if (smoothedGasPpm < 0) {
+        smoothedGasPpm = (float)rawGas;
+    } else {
+        smoothedGasPpm = (smoothedGasPpm * 0.80f) + ((float)rawGas * 0.20f);
+    }
+    int gasValue = (int)smoothedGasPpm;
 
-    // Read DHT11
-    float t = dht.readTemperature();
-    float h = dht.readHumidity();
-    if (!isnan(t)) currentTemp = t;
-    if (!isnan(h)) currentHum = h;
+    // 2. STATUS WITH HYSTERESIS (Prevents chatter around threshold border)
+    String airStatus = lastInternalStatus;
+    if (lastInternalStatus == "SAFE") {
+        if (gasValue >= thresholdDanger) {
+            airStatus = "DANGER";
+        } else if (gasValue >= thresholdWarn) {
+            airStatus = "WARN";
+        }
+    } else if (lastInternalStatus == "WARN") {
+        if (gasValue >= thresholdDanger) {
+            airStatus = "DANGER";
+        } else if (gasValue < (thresholdWarn - 20)) { // 20 PPM hysteresis drop
+            airStatus = "SAFE";
+        }
+    } else if (lastInternalStatus == "DANGER") {
+        if (gasValue < (thresholdDanger - 30)) { // 30 PPM hysteresis drop
+            airStatus = (gasValue >= thresholdWarn) ? "WARN" : "SAFE";
+        }
+    }
 
-    String airStatus = (gasValue >= thresholdDanger) ? "DANGER" : (gasValue >= thresholdWarn ? "WARN" : "SAFE");
-
-    // 2. STATUS CHANGE LOGIC
+    // 3. STATUS CHANGE LOGIC
     if (airStatus != lastInternalStatus) {
         if (airStatus != "SAFE" && isSanitationActive) {
             stopSanitation();
@@ -702,7 +734,7 @@ void loop() {
 
     updateSanitation();
 
-    // 3. FAN CONTROL
+    // 4. FAN CONTROL (With Debounce Safety)
     bool fanShouldBeOn = (currentFanMode == "ON") || (currentFanMode == "AUTO" && airStatus != "SAFE");
     if (isSanitationActive && currentFanMode == "AUTO") {
         fanShouldBeOn = false;
@@ -712,7 +744,7 @@ void loop() {
     digitalWrite(GREEN_LED, airStatus == "SAFE");
     digitalWrite(RED_LED, airStatus != "SAFE");
 
-    // 4. WI-FI RECOVERY WATCHDOG
+    // 5. WI-FI RECOVERY WATCHDOG
     if (WiFi.status() != WL_CONNECTED) {
         if (wifiLostTime == 0) {
             wifiLostTime = now;
@@ -727,18 +759,18 @@ void loop() {
         wifiLossHandled = false;
     }
 
-    // 5. SERIAL MONITOR OUTPUT (1.5s Interval)
+    // 6. SERIAL MONITOR OUTPUT (1.5s Interval)
     if (now - lastSerial >= SERIAL_INTERVAL) {
         lastSerial = now;
         Serial.println("--------------------------------------");
-        Serial.printf("[SENSOR] Gas: %d | Temp: %.1f°C | Status: %s\n", gasValue, currentTemp, airStatus.c_str());
+        Serial.printf("[SENSOR] Gas: %d (Raw: %d) | Status: %s\n", gasValue, rawGas, airStatus.c_str());
         Serial.printf("[FAN] Status: %s | Mode: %s\n", isFanPhysicallyActive ? "ON" : "OFF", currentFanMode.c_str());
         Serial.printf("[PUMP] Status: %s\n", isSanitationActive ? "ACTIVE" : "READY");
         Serial.printf("[WIFI] %s\n", (WiFi.status() == WL_CONNECTED) ? "Connected" : "Disconnected");
         Serial.printf("[FIREBASE] %s\n", Firebase.ready() ? "Connected" : "Offline");
     }
 
-    // 6. FIREBASE SYNC (Intervals)
+    // 7. FIREBASE SYNC (Intervals)
     if (Firebase.ready()) {
         if (now - lastConfig >= CONFIG_INTERVAL) {
             lastConfig = now;

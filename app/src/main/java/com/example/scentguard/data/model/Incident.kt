@@ -9,7 +9,6 @@ data class StaffAction(
     val startTime: Timestamp = Timestamp.now(),
     val completionTime: Timestamp? = null,
     val gasSnapshot: Int = 0,
-    val tempSnapshot: Float = 0f,
     val actionType: String = "",
     val status: String = "COMPLETED", 
     val message: String = "",         
@@ -26,9 +25,7 @@ data class Incident(
     val durationMillis: Long? = null,
     val initialGas: Int = 0,
     val finalGas: Int? = null,
-    val initialTemp: Float = 0f,
-    val finalTemp: Float? = null,
-    val triggerType: String = "", // "GAS", "TEMPERATURE", "BOTH"
+    val triggerType: String = "GAS", // "GAS"
     val actionPerformed: String = "", // Recommended action title
     val status: String = "IN_PROGRESS", // "IN_PROGRESS", "CLEARED"
     val actions: List<StaffAction> = emptyList(),

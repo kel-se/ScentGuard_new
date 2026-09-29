@@ -19,10 +19,6 @@ class ChartRepository(
         return getSensorHistory(restaurantId, "currentGasPpm", 0f, 2000f, "ppm", isWeekly)
     }
 
-    suspend fun getTemperatureHistory(restaurantId: String, isWeekly: Boolean = false): Result<ChartData> {
-        return getSensorHistory(restaurantId, "temperature", 0f, 100f, "°C", isWeekly)
-    }
-
     private suspend fun getSensorHistory(
         restaurantId: String,
         fieldName: String,

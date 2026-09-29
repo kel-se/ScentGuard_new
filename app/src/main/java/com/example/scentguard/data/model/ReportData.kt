@@ -5,6 +5,5 @@ data class ReportSummary(
     val totalFanRuntime: String = "0m",
     val airQualityScore: Int = 0,
     val alertsCount: Int = 0,
-    val avgTemp: String = "0°C",
     val period: String = "Daily"
 )

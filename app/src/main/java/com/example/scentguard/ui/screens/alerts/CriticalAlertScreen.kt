@@ -287,8 +287,8 @@ fun DangerHeader(isDanger: Boolean, hasResponded: Boolean) {
 fun LiveMetricsCard(restaurant: Restaurant) {
     ScentGuardCard(modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.padding(24.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+            modifier = Modifier.padding(24.dp).fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
             MetricItem(
@@ -296,15 +296,6 @@ fun LiveMetricsCard(restaurant: Restaurant) {
                 value = "${restaurant.currentGasPpm}",
                 unit = "ppm",
                 isDanger = restaurant.currentGasPpm >= restaurant.thresholdDanger
-            )
-            
-            VerticalDivider(modifier = Modifier.height(40.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
-            
-            MetricItem(
-                label = "Temperature",
-                value = String.format(Locale.getDefault(), "%.1f", restaurant.temperature),
-                unit = "°C",
-                isDanger = restaurant.temperature >= restaurant.tempThresholdDanger
             )
         }
     }
@@ -339,16 +330,11 @@ fun MetricItem(label: String, value: String, unit: String, isDanger: Boolean) {
 fun RecommendationCard(restaurant: Restaurant, hasResponded: Boolean) {
     val isDanger = restaurant.airStatus == "DANGER"
     val isGasCritical = restaurant.currentGasPpm >= restaurant.thresholdDanger
-    val isTempCritical = restaurant.temperature >= restaurant.tempThresholdDanger
     
     val recommendation = when {
         !isDanger -> "Environment has returned to safe parameters. No further action needed."
         hasResponded -> "ScentGuard continues monitoring independently."
-        else -> when {
-            isGasCritical && isTempCritical -> "Inspect and Remove Waste & Check Ventilation"
-            isGasCritical -> "Inspect and Remove Waste"
-            else -> "Check Ventilation"
-        }
+        else -> if (isGasCritical) "Inspect and Remove Waste" else "Check Ventilation"
     }
 
     val color = when {

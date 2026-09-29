@@ -99,22 +99,19 @@ class ScentGuardWatcherService : Service() {
                     val fanStatus = snapshot.getString("fanStatus") ?: "OFF"
                     val fanMode = snapshot.getString("fanMode") ?: "AUTO"
                     val gasPpm = snapshot.getLong("currentGasPpm") ?: 0
-                    val temp = snapshot.getDouble("temperature")?.toFloat() ?: 0f
                     val lastSeen = snapshot.getTimestamp("lastSeen")
                     
                     // Dynamic thresholds from Firestore
                     val tWarn = snapshot.getLong("thresholdWarn")?.toInt() ?: com.example.scentguard.data.model.Restaurant.DEFAULT_THRESHOLD_WARN
                     val tDanger = snapshot.getLong("thresholdDanger")?.toInt() ?: com.example.scentguard.data.model.Restaurant.DEFAULT_THRESHOLD_DANGER
-                    val twTemp = snapshot.getDouble("tempThresholdWarn")?.toFloat() ?: 40f
-                    val tdTemp = snapshot.getDouble("tempThresholdDanger")?.toFloat() ?: 50f
 
                     // Heartbeat check: Offline status must NEVER trigger the audio alarm
                     val isOnline = lastSeen?.let { (System.currentTimeMillis() - it.toDate().time) < 150000 } ?: false
                     
                     // 1. Air Status Transitions
                     val currentAirStatus = when {
-                        gasPpm >= tDanger || temp >= tdTemp -> "DANGER"
-                        gasPpm >= tWarn || temp >= twTemp -> "WARN"
+                        gasPpm >= tDanger -> "DANGER"
+                        gasPpm >= tWarn -> "WARN"
                         else -> "SAFE"
                     }
                     
@@ -122,7 +119,7 @@ class ScentGuardWatcherService : Service() {
                         val oldStatus = lastKnownAirStatus!!
                         lastKnownAirStatus = currentAirStatus // Update immediately to prevent duplicate triggers
                         
-                        handleAirStatusTransition(restaurantId, oldStatus, currentAirStatus, gasPpm.toInt(), temp, lastSeen)
+                        handleAirStatusTransition(restaurantId, oldStatus, currentAirStatus, gasPpm.toInt(), lastSeen)
                         
                         // Reset acknowledgment when condition clears
                         if (currentAirStatus == "SAFE" || currentAirStatus == "WARN") {
@@ -154,11 +151,11 @@ class ScentGuardWatcherService : Service() {
             }
     }
 
-    private fun handleAirStatusTransition(rid: String, old: String, new: String, ppm: Int, temp: Float, ts: Timestamp?) {
+    private fun handleAirStatusTransition(rid: String, old: String, new: String, ppm: Int, ts: Timestamp?) {
         val anchor = ts ?: Timestamp.now()
         if (new == "DANGER") {
-            triggerDangerAlert(ppm, temp)
-            val desc = if (ppm >= 1500) "Critical gas concentration alert!" else "Critical temperature threshold reached!"
+            triggerDangerAlert(ppm)
+            val desc = "Critical gas concentration alert!"
             logEvent(rid, "AIR_DANGER", "Hazardous Conditions Detected", desc, HistoryType.ALERT, ppm, "SYSTEM", anchor)
             
             // AUTOMATED INCIDENT LIFECYCLE: Create if missing
@@ -169,9 +166,8 @@ class ScentGuardWatcherService : Service() {
                     restaurantId = rid,
                     startTime = anchor,
                     initialGas = ppm,
-                    initialTemp = temp,
-                    triggerType = if (ppm >= 1500) "GAS" else "TEMPERATURE",
-                    actionPerformed = if (ppm >= 1500) "Inspect and Remove Waste" else "Check Ventilation",
+                    triggerType = "GAS",
+                    actionPerformed = "Inspect and Remove Waste",
                     status = "IN_PROGRESS"
                 )
                 app?.historyRepository?.createIncidentIfMissing(incident)
@@ -228,7 +224,7 @@ class ScentGuardWatcherService : Service() {
         }
     }
 
-    private fun triggerDangerAlert(ppm: Int, temp: Float) {
+    private fun triggerDangerAlert(ppm: Int) {
         val intent = Intent(this, MainActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
 
@@ -237,7 +233,7 @@ class ScentGuardWatcherService : Service() {
         }
         val stopPendingIntent = PendingIntent.getService(this, 0, stopIntent, PendingIntent.FLAG_IMMUTABLE)
         
-        val message = "Hazardous conditions: $ppm ppm, \${String.format(java.util.Locale.getDefault(), \"%.1f\", temp)}°C. Check storage immediately."
+        val message = "Hazardous conditions: $ppm ppm. Check storage immediately."
 
         val notification = NotificationCompat.Builder(this, ALERT_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_scentguard_logo_vector)

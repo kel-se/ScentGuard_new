@@ -165,9 +165,7 @@ fun DashboardScreen(
                     
                     item {
                         MetricsGrid(
-                            isWideScreen = isWideScreen,
                             gasLevel = if (isOnline) liveData?.currentGasPpm ?: 0 else 0,
-                            temp = if (isOnline) liveData?.temperature ?: 0f else 0f,
                             pumpStatus = liveData?.pumpStatus ?: "OFF",
                             onPumpClick = { navController.navigate(Screen.SanitationPump.route) }
                         )
@@ -429,9 +427,7 @@ fun AirQualityHero(
 
 @Composable
 fun MetricsGrid(
-    isWideScreen: Boolean,
     gasLevel: Int,
-    temp: Float,
     pumpStatus: String = "OFF",
     onPumpClick: () -> Unit
 ) {
@@ -445,39 +441,18 @@ fun MetricsGrid(
         
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             MetricCard(
-                label = "System Temp",
-                value = String.format(java.util.Locale.getDefault(), "%.1f", temp),
-                unit = "°C",
-                icon = Icons.Outlined.Thermostat,
-                modifier = Modifier.weight(1f)
-            )
-            MetricCard(
                 label = "Gas Level",
                 value = gasLevel.toString(),
                 unit = "ppm",
                 icon = Icons.Outlined.Cloud,
                 modifier = Modifier.weight(1f)
             )
-            if (isWideScreen) {
-                MetricCard(
-                    label = "Sanitation Pump",
-                    value = if (pumpStatus == "ON") "Spraying" else "Standby",
-                    unit = "",
-                    icon = Icons.Outlined.Opacity,
-                    modifier = Modifier.weight(1f).clickable { onPumpClick() },
-                    valueColor = if (pumpStatus == "ON") Color(0xFF34C759) else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-        
-        if (!isWideScreen) {
             MetricCard(
                 label = "Sanitation Pump",
                 value = if (pumpStatus == "ON") "Spraying" else "Standby",
                 unit = "",
                 icon = Icons.Outlined.Opacity,
-                modifier = Modifier.fillMaxWidth().clickable { onPumpClick() },
-                valueStyle = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.weight(1f).clickable { onPumpClick() },
                 valueColor = if (pumpStatus == "ON") Color(0xFF34C759) else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }

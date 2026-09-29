@@ -16,12 +16,8 @@ data class Restaurant(
     val manualSanitationTrigger: Timestamp? = null,
     val lastSanitationTime: Timestamp? = null,
     val sanitationDurationSeconds: Int = 50, // Match firmware default
-    val temperature: Float = 0f,
-    val humidity: Float = 0f,
     val thresholdWarn: Int = 1000,
     val thresholdDanger: Int = 1500,
-    val tempThresholdWarn: Float = 40f,
-    val tempThresholdDanger: Float = 50f,
     val lastSeen: Timestamp? = null,
     val fanMode: String = "AUTO", // "ON", "OFF", "AUTO"
     val createdAt: Timestamp? = null
