@@ -127,9 +127,9 @@ class MainViewModel(
 
         val diffMs = currentTime - lastSeen.time
         _signalStatus.value = when {
-            diffMs < 6000 -> "Active"      // < 6s for Active
-            diffMs < 12000 -> "Weak"       // < 12s for Weak
-            else -> "Offline"              // > 12s for Offline
+            diffMs < 15000 -> "Active"      // < 15s for Active
+            diffMs < 45000 -> "Weak"        // < 45s for Weak
+            else -> "Offline"               // > 45s for Offline
         }
     }
 

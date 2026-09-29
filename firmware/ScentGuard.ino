@@ -28,7 +28,7 @@
 // Timing (Non-blocking)
 #define SERIAL_INTERVAL 1500UL
 #define TELEMETRY_INTERVAL 3000UL
-#define CONFIG_INTERVAL 5000UL
+#define CONFIG_INTERVAL 10000UL // 10s to prevent overlapping HTTPS requests
 #define HISTORY_INTERVAL 60000UL
 #define WIFI_RECOVERY_TIMEOUT 60000UL
 #define FAN_DEBOUNCE_TIME 2000UL // Minimum time (ms) before fan can toggle state
@@ -360,18 +360,13 @@ bool loadCredentials() {
 }
 
 String getTimestamp() {
-    time_t now =
-            time(nullptr);
-    if (
-            now < 100000
-            ) {
+    time_t now = time(nullptr);
+    if (now < 100000) {
+        configTime(0, 0, "pool.ntp.org", "time.nist.gov");
         return "";
     }
     struct tm timeinfo;
-    gmtime_r(
-            &now,
-            &timeinfo
-    );
+    gmtime_r(&now, &timeinfo);
     char timestamp[32];
     strftime(
             timestamp,
@@ -379,68 +374,41 @@ String getTimestamp() {
             "%Y-%m-%dT%H:%M:%SZ",
             &timeinfo
     );
-    return String(
-            timestamp
-    );
+    return String(timestamp);
 }
 
 String getSlotID() {
     struct tm timeinfo;
-    if (
-            !getLocalTime(
-                    &timeinfo
-            )
-            ) {
-        return (
-                "snap_" +
-                String(millis())
-        );
+    if (!getLocalTime(&timeinfo)) {
+        return ("snap_" + String(millis()));
     }
-    int slotMin =
-            (timeinfo.tm_min / 15) * 15;
+    int slotMin = (timeinfo.tm_min / 15) * 15;
     char buf[32];
-    strftime(
-            buf,
-            sizeof(buf),
-            "snap_%Y%m%d_%H",
-            &timeinfo
-    );
-    String id =
-            String(buf);
-    if (
-            slotMin < 10
-            ) {
+    strftime(buf, sizeof(buf), "snap_%Y%m%d_%H", &timeinfo);
+    String id = String(buf);
+    if (slotMin < 10) {
         id += "0";
     }
-    id += String(
-            slotMin
-    );
+    id += String(slotMin);
     return id;
 }
 
 void syncTime() {
-    configTime(
-            0,
-            0,
-            "pool.ntp.org",
-            "time.nist.gov"
-    );
-    Serial.print(
-            "Syncing Time"
-    );
-    time_t now =
-            time(nullptr);
-    while (
-            now < 8 * 3600 * 2
-            ) {
-        delay(500);
+    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+    Serial.print("Syncing Time");
+    time_t now = time(nullptr);
+    int retries = 0;
+    while (now < 8 * 3600 * 2 && retries < 15) {
+        delay(300);
         Serial.print(".");
-        now =
-                time(nullptr);
+        now = time(nullptr);
+        retries++;
     }
-    Serial.println(
-            "\nTime OK!"
-    );
+    if (now >= 8 * 3600 * 2) {
+        Serial.println("\nTime OK!");
+    } else {
+        Serial.println("\nTime sync continuing in background...");
+    }
 }
 
 void readRemoteConfig() {
@@ -517,19 +485,14 @@ void uploadTelemetry(
             ? "ON"
             : "OFF"
     );
-    String ts =
-            getTimestamp();
-    if (
-            ts != ""
-            ) {
+    String ts = getTimestamp();
+    if (ts != "") {
         content.set(
                 "fields/lastSeen/timestampValue",
                 ts
         );
     }
-    String path =
-            "restaurants/" +
-            activeRestaurantId;
+    String path = "restaurants/" + activeRestaurantId;
     if (
             Firebase.Firestore.patchDocument(
                     &fbdo_telem,
@@ -654,6 +617,24 @@ void setup() {
 
 void loop() {
     unsigned long now = millis();
+
+    // Live BOOT Button Check (Hold for 5 seconds anytime to clear NVS and reset)
+    static unsigned long bootPressStart = 0;
+    if (digitalRead(BOOT_BUTTON) == LOW) {
+        if (bootPressStart == 0) {
+            bootPressStart = now;
+            Serial.println("\n[RESET] BOOT Button Pressed. Hold for 5 seconds to reset...");
+        } else if (now - bootPressStart >= 5000UL) {
+            Serial.println("\n[RESET] 5 seconds elapsed! Clearing saved WiFi/RID credentials and restarting...");
+            preferences.begin("scentguard", false);
+            preferences.clear();
+            preferences.end();
+            delay(1000);
+            ESP.restart();
+        }
+    } else {
+        bootPressStart = 0;
+    }
 
     if (isProvisioning) {
         digitalWrite(RED_LED, (now / 500) % 2 == 0);
