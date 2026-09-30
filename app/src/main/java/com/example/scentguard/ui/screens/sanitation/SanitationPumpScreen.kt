@@ -28,12 +28,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.scentguard.data.model.HistoryItem
 import com.example.scentguard.data.model.Restaurant
-import com.example.scentguard.ui.components.ScentGuardButton
 import com.example.scentguard.ui.components.ScentGuardCard
 import com.example.scentguard.utils.Resource
 import com.example.scentguard.viewmodel.MainViewModel
 import com.example.scentguard.viewmodel.ViewModelFactory
-import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -44,42 +42,16 @@ fun SanitationPumpScreen(
     mainViewModel: MainViewModel,
     viewModel: SanitationViewModel = viewModel(factory = ViewModelFactory(LocalContext.current.applicationContext as android.app.Application))
 ) {
-    val userProfileResource by mainViewModel.userProfile.collectAsState()
-    val user = (userProfileResource as? Resource.Success)?.data
     val liveData by mainViewModel.liveRestaurantData.collectAsState()
     val signalStatus by mainViewModel.signalStatus.collectAsState()
     val history by viewModel.sanitationHistory.collectAsState()
-    val actionState by viewModel.actionState.collectAsState()
 
     val isOnline = signalStatus == "Active" || signalStatus == "Weak"
-    val isManager = user?.role?.uppercase() == "MANAGER"
-
-    var showTriggerDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(liveData?.id) {
         liveData?.id?.let { rid ->
             viewModel.fetchSanitationHistory(rid)
         }
-    }
-
-    if (showTriggerDialog) {
-        AlertDialog(
-            onDismissRequest = { showTriggerDialog = false },
-            title = { Text("Start Sanitation?", fontWeight = FontWeight.Bold) },
-            text = { Text("Ensure the area is clear and the sanitation system is ready before proceeding.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    liveData?.id?.let { viewModel.triggerSanitation(it) }
-                    showTriggerDialog = false
-                }) {
-                    Text("Start Now", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showTriggerDialog = false }) { Text("Cancel") }
-            },
-            shape = RoundedCornerShape(28.dp)
-        )
     }
 
     Scaffold(
@@ -105,7 +77,6 @@ fun SanitationPumpScreen(
             item {
                 PumpHeroCard(
                     status = liveData?.pumpStatus ?: "OFF",
-                    mode = liveData?.pumpMode ?: "AUTO",
                     isOnline = isOnline
                 )
             }
@@ -117,16 +88,7 @@ fun SanitationPumpScreen(
             }
 
             item {
-                PumpControlSection(
-                    isManager = isManager,
-                    isOnline = isOnline,
-                    currentMode = liveData?.pumpMode ?: "AUTO",
-                    isPumpOn = liveData?.pumpStatus == "ON",
-                    onModeChange = { mode -> 
-                        liveData?.id?.let { viewModel.updatePumpMode(it, mode) }
-                    },
-                    onTrigger = { showTriggerDialog = true }
-                )
+                PumpAutomationInfoCard()
             }
 
             item {
@@ -147,7 +109,7 @@ fun SanitationPumpScreen(
 }
 
 @Composable
-fun PumpHeroCard(status: String, mode: String, isOnline: Boolean) {
+fun PumpHeroCard(status: String, isOnline: Boolean) {
     val isActive = status == "ON" && isOnline
     val statusColor = if (isActive) Color(0xFF34C759) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
     
@@ -242,73 +204,39 @@ fun OfflineWarningCard() {
             Spacer(Modifier.width(16.dp))
             Column {
                 Text("Hardware Offline", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
-                Text("Pump controls are disabled until connection is restored.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f))
+                Text("Pump status monitoring is disabled until connection is restored.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f))
             }
         }
     }
 }
 
 @Composable
-fun PumpControlSection(
-    isManager: Boolean,
-    isOnline: Boolean,
-    currentMode: String,
-    isPumpOn: Boolean,
-    onModeChange: (String) -> Unit,
-    onTrigger: () -> Unit
-) {
-    Column {
-        Text("Operation Control", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 16.dp))
-        
-        ScentGuardCard(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    ModeCard("AUTO", currentMode == "AUTO", isManager && isOnline, Modifier.weight(1f)) { onModeChange("AUTO") }
-                    ModeCard("OFF", currentMode == "OFF", isManager && isOnline, Modifier.weight(1f)) { onModeChange("OFF") }
-                }
-                
-                Spacer(Modifier.height(20.dp))
-                
-                Button(
-                    onClick = onTrigger,
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    enabled = isManager && isOnline && !isPumpOn,
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                ) {
-                    Icon(Icons.Outlined.PlayArrow, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(if (isPumpOn) "Cycle in Progress" else "Start Manual Sanitation", fontWeight = FontWeight.Bold)
-                }
-                
-                if (!isManager) {
-                    Text(
-                        "Only managers can control the sanitation pump.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                        modifier = Modifier.padding(top = 12.dp).align(Alignment.CenterHorizontally)
-                    )
+fun PumpAutomationInfoCard() {
+    ScentGuardCard(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Outlined.AutoMode, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun ModeCard(label: String, selected: Boolean, enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        enabled = enabled,
-        shape = RoundedCornerShape(16.dp),
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)),
-        modifier = modifier
-    ) {
-        Box(modifier = Modifier.padding(16.dp), contentAlignment = Alignment.Center) {
-            Text(label, fontWeight = FontWeight.Bold, color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(16.dp))
+            Column {
+                Text("Automated Sanitation", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(
+                    "The system automatically triggers a 50-second sanitation cycle whenever hazardous air conditions return to safe parameters.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(top = 4.dp),
+                    lineHeight = 16.sp
+                )
+            }
         }
     }
 }
@@ -394,7 +322,7 @@ fun SafetyNoticeSection() {
             Column {
                 Text("Safety Notice", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                 Text(
-                    "The sanitation pump should only operate when the sanitation system is ready. Check the pump, water supply, and surrounding area before manual activation.",
+                    "The sanitation pump operates automatically when hazardous air conditions stabilize. Ensure the system is maintained and water supply is secure.",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     lineHeight = 16.sp,
