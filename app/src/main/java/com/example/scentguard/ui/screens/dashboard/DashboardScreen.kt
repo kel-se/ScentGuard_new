@@ -378,10 +378,10 @@ fun AirQualityHero(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = statusText,
-                        style = MaterialTheme.typography.displayLarge,
-                        fontWeight = FontWeight.Black,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Normal,
                         color = statusColor,
-                        letterSpacing = (-2).sp
+                        letterSpacing = 0.sp
                     )
                     Text(
                         text = "$gasLevel ppm",
@@ -453,6 +453,7 @@ fun MetricsGrid(
                 unit = "",
                 icon = Icons.Outlined.Opacity,
                 modifier = Modifier.weight(1f).clickable { onPumpClick() },
+                valueStyle = MaterialTheme.typography.headlineMedium,
                 valueColor = if (pumpStatus == "ON") Color(0xFF34C759) else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -498,7 +499,9 @@ fun MetricCard(
                     style = valueStyle, 
                     fontWeight = FontWeight.Black, 
                     color = valueColor,
-                    letterSpacing = (-1).sp
+                    letterSpacing = (-1).sp,
+                    maxLines = 1,
+                    softWrap = false
                 )
                 if (unit.isNotEmpty()) {
                     Text(

@@ -154,7 +154,7 @@ fun PumpHeroCard(status: String, mode: String, isOnline: Boolean) {
     val infiniteTransition = rememberInfiniteTransition(label = "flow")
     val flowScale by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue = 1.2f,
+        targetValue = 1.15f,
         animationSpec = infiniteRepeatable(
             animation = tween(1500, easing = EaseInOutSine),
             repeatMode = RepeatMode.Reverse
@@ -168,20 +168,20 @@ fun PumpHeroCard(status: String, mode: String, isOnline: Boolean) {
         borderColor = if (isActive) Color(0xFF34C759).copy(alpha = 0.2f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)
     ) {
         Column(
-            modifier = Modifier.padding(32.dp),
+            modifier = Modifier.padding(vertical = 24.dp, horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(contentAlignment = Alignment.Center) {
                 if (isActive) {
                     Box(
                         modifier = Modifier
-                            .size(100.dp)
+                            .size(80.dp)
                             .scale(flowScale)
                             .background(Color(0xFF34C759).copy(alpha = 0.1f), CircleShape)
                     )
                 }
                 Surface(
-                    modifier = Modifier.size(80.dp),
+                    modifier = Modifier.size(64.dp),
                     shape = CircleShape,
                     color = if (isActive) Color(0xFF34C759).copy(alpha = 0.1f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
                 ) {
@@ -190,29 +190,30 @@ fun PumpHeroCard(status: String, mode: String, isOnline: Boolean) {
                             Icons.Outlined.Opacity,
                             null,
                             tint = if (isActive) Color(0xFF34C759) else MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(40.dp)
+                            modifier = Modifier.size(30.dp)
                         )
                     }
                 }
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(16.dp))
             
             Text(
                 "Sanitation Pump",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Black
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
             )
             
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(top = 8.dp)
+                modifier = Modifier.padding(top = 6.dp)
             ) {
-                Box(modifier = Modifier.size(8.dp).background(statusColor, CircleShape))
-                Spacer(Modifier.width(8.dp))
+                Box(modifier = Modifier.size(7.dp).background(statusColor, CircleShape))
+                Spacer(Modifier.width(6.dp))
                 Text(
                     text = if (!isOnline) "Offline" else if (isActive) "Active" else "Ready",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.labelMedium,
                     color = statusColor,
                     fontWeight = FontWeight.Bold
                 )
@@ -223,7 +224,7 @@ fun PumpHeroCard(status: String, mode: String, isOnline: Boolean) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 12.dp)
+                modifier = Modifier.padding(top = 8.dp)
             )
         }
     }

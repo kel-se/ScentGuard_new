@@ -164,47 +164,85 @@ fun HistoryScreen(
                         )
                     )
 
-                    // Category Filters
-                    ScrollableTabRow(
-                        selectedTabIndex = listOf("All", "Alerts", "Devices", "Fan", "Users", "System").indexOf(selectedCategory),
-                        containerColor = Color.Transparent,
-                        edgePadding = 24.dp,
-                        divider = {},
-                        indicator = {}
-                    ) {
-                        listOf("All", "Alerts", "Devices", "Fan", "Users", "System").forEach { category ->
-                            FilterChip(
-                                selected = selectedCategory == category,
-                                onClick = { viewModel.setCategory(category) },
-                                label = { Text(category) },
-                                modifier = Modifier.padding(end = 8.dp),
-                                shape = CircleShape,
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                                    selectedLabelColor = MaterialTheme.colorScheme.primary
-                                )
-                            )
-                        }
-                    }
-
-                    // Date Filters
+                    // Compact Filter Toolbar
                     Row(
                         modifier = Modifier
-                            .padding(horizontal = 24.dp, vertical = 8.dp)
+                            .responsiveContainer(maxWidth = 480.dp)
+                            .padding(horizontal = 24.dp, vertical = 4.dp)
                             .fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        listOf("All", "Today", "Last 7 Days", "Last 30 Days").forEach { range ->
-                            FilterChip(
-                                selected = selectedDateRange == range,
-                                onClick = { viewModel.setDateRange(range) },
-                                label = { Text(range, fontSize = 12.sp) },
-                                shape = CircleShape,
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
-                                    selectedLabelColor = MaterialTheme.colorScheme.secondary
-                                )
-                            )
+                        // Category Dropdown
+                        var categoryExpanded by remember { mutableStateOf(false) }
+                        val categories = listOf("All", "Alerts", "Devices", "Fan", "Users", "System")
+                        
+                        Box(modifier = Modifier.weight(1f)) {
+                            OutlinedButton(
+                                onClick = { categoryExpanded = true },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Category: $selectedCategory", style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                                    Icon(Icons.Outlined.ArrowDropDown, null, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                            DropdownMenu(
+                                expanded = categoryExpanded,
+                                onDismissRequest = { categoryExpanded = false }
+                            ) {
+                                categories.forEach { cat ->
+                                    DropdownMenuItem(
+                                        text = { Text(cat) },
+                                        onClick = {
+                                            viewModel.setCategory(cat)
+                                            categoryExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        // Date Range Dropdown
+                        var dateExpanded by remember { mutableStateOf(false) }
+                        val dateRanges = listOf("All", "Today", "Last 7 Days", "Last 30 Days")
+                        
+                        Box(modifier = Modifier.weight(1f)) {
+                            OutlinedButton(
+                                onClick = { dateExpanded = true },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Time: $selectedDateRange", style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                                    Icon(Icons.Outlined.ArrowDropDown, null, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                            DropdownMenu(
+                                expanded = dateExpanded,
+                                onDismissRequest = { dateExpanded = false }
+                            ) {
+                                dateRanges.forEach { range ->
+                                    DropdownMenuItem(
+                                        text = { Text(range) },
+                                        onClick = {
+                                            viewModel.setDateRange(range)
+                                            dateExpanded = false
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -338,24 +376,17 @@ fun HistorySkeletonList() {
     LazyColumn(
         modifier = Modifier.fillMaxSize().responsiveContainer(maxWidth = 600.dp),
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
         userScrollEnabled = false
     ) {
-        items(5) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.surface,
-                border = androidx.compose.foundation.BorderStroke(0.5.dp, Color.Black.copy(alpha = 0.05f))
-            ) {
-                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(44.dp).clip(CircleShape).shimmerEffect())
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Box(modifier = Modifier.width(120.dp).height(20.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect())
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Box(modifier = Modifier.width(200.dp).height(16.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect())
-                    }
+        items(6) {
+            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.size(36.dp).clip(CircleShape).shimmerEffect())
+                Spacer(modifier = Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Box(modifier = Modifier.width(120.dp).height(16.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect())
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Box(modifier = Modifier.width(200.dp).height(14.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect())
                 }
             }
         }
@@ -384,103 +415,106 @@ fun HistoryCard(item: HistoryItem) {
         else -> Icons.Outlined.Info
     }
 
-    val backgroundColor = if (isStaffResponse) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+    val containerBg = if (isStaffResponse) {
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
     } else {
-        MaterialTheme.colorScheme.surface
+        Color.Transparent
     }
 
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        color = backgroundColor,
-        shadowElevation = if (isStaffResponse) 0.dp else 2.dp,
-        border = androidx.compose.foundation.BorderStroke(
-            if (isStaffResponse) 1.dp else 0.5.dp, 
-            if (isStaffResponse) color.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
-        )
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(containerBg, RoundedCornerShape(12.dp))
+            .padding(horizontal = if (isStaffResponse) 8.dp else 0.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 10.dp, horizontal = 4.dp)
         ) {
-            if (isStaffResponse) {
-                val mascot = MascotAvatars.getById("robot")
-                if (mascot != null) {
-                    ScentGuardMascotAvatar(
-                        mascot = mascot,
-                        modifier = Modifier.size(44.dp)
-                    )
-                }
-            } else {
-                Surface(
-                    modifier = Modifier.size(44.dp),
-                    color = color.copy(alpha = 0.1f),
-                    shape = CircleShape
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(icon, null, tint = color, modifier = Modifier.size(20.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (isStaffResponse) {
+                    val mascot = MascotAvatars.getById("robot")
+                    if (mascot != null) {
+                        ScentGuardMascotAvatar(
+                            mascot = mascot,
+                            modifier = Modifier.size(36.dp)
+                        )
+                    }
+                } else {
+                    Surface(
+                        modifier = Modifier.size(36.dp),
+                        color = color.copy(alpha = 0.1f),
+                        shape = CircleShape
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(icon, null, tint = color, modifier = Modifier.size(18.dp))
+                        }
                     }
                 }
-            }
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            Column(modifier = Modifier.weight(1f)) {
-                val displayTitle = if (isStaffResponse) "Staff Response" else item.title
                 
-                Text(
-                    text = displayTitle, 
-                    style = MaterialTheme.typography.titleMedium, 
-                    fontWeight = FontWeight.Bold,
-                    color = if (isStaffResponse) color else MaterialTheme.colorScheme.onSurface
-                )
+                Spacer(modifier = Modifier.width(14.dp))
                 
-                if (isStaffResponse) {
-                    val parts = item.description.split(": ", limit = 2)
-                    if (parts.size == 2) {
+                Column(modifier = Modifier.weight(1f)) {
+                    val displayTitle = if (isStaffResponse) "Staff Response" else item.title
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
-                            text = parts[0], 
+                            text = displayTitle, 
                             style = MaterialTheme.typography.bodyMedium, 
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(top = 2.dp)
+                            color = if (isStaffResponse) color else MaterialTheme.colorScheme.onSurface
                         )
+                        
                         Text(
-                            text = parts[1], 
-                            style = MaterialTheme.typography.bodyMedium, 
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = SimpleDateFormat("MMM dd, hh:mm a", Locale.getDefault()).format(item.timestamp.toDate()),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
+                    
+                    if (isStaffResponse) {
+                        val parts = item.description.split(": ", limit = 2)
+                        val descText = if (parts.size == 2) "${parts[0]} — ${parts[1]}" else item.description
+                        Text(
+                            text = descText, 
+                            style = MaterialTheme.typography.bodySmall, 
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 2.dp)
                         )
                     } else {
                         Text(
                             text = item.description, 
-                            style = MaterialTheme.typography.bodyMedium, 
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = MaterialTheme.typography.bodySmall, 
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 2.dp)
                         )
                     }
-                } else {
+                }
+                
+                if (item.value != null) {
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = item.description, 
-                        style = MaterialTheme.typography.bodyMedium, 
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = item.value,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = color
                     )
                 }
-
-                Text(
-                    text = SimpleDateFormat("MMM dd, hh:mm a", Locale.getDefault()).format(item.timestamp.toDate()),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    modifier = Modifier.padding(top = 4.dp)
-                )
             }
             
-            if (item.value != null) {
-                Text(
-                    text = item.value,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Black,
-                    color = color
-                )
-            }
+            Spacer(modifier = Modifier.height(10.dp))
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f),
+                thickness = 1.dp
+            )
         }
     }
 }
