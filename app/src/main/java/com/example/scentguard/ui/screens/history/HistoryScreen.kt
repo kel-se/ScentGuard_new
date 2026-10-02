@@ -1,9 +1,10 @@
 package com.example.scentguard.ui.screens.history
 
+import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -16,22 +17,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import android.app.Application
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.scentguard.data.model.HistoryItem
 import com.example.scentguard.data.model.HistoryType
 import com.example.scentguard.data.model.MascotAvatars
 import com.example.scentguard.navigation.Screen
-import com.example.scentguard.ui.components.ScentGuardFloatingNav
 import com.example.scentguard.ui.components.ScentGuardMascotAvatar
 import com.example.scentguard.ui.components.ScentGuardNavigationDrawer
 import com.example.scentguard.utils.Resource
-import com.example.scentguard.utils.isScrollingUp
 import com.example.scentguard.utils.responsiveContainer
 import com.example.scentguard.utils.shimmerEffect
 import com.example.scentguard.viewmodel.HistoryViewModel
@@ -46,21 +46,20 @@ import java.util.*
 fun HistoryScreen(
     navController: NavHostController,
     mainViewModel: MainViewModel,
-    viewModel: HistoryViewModel = viewModel(factory = ViewModelFactory(LocalContext.current.applicationContext as android.app.Application))
+    viewModel: HistoryViewModel = viewModel(factory = ViewModelFactory(LocalContext.current.applicationContext as Application))
 ) {
-    val userProfileResource by mainViewModel.userProfile.collectAsState()
-    val user = (userProfileResource as? Resource.Success)?.data
-    
-    val historyState by viewModel.historyState.collectAsState()
-    val selectedCategory by viewModel.selectedCategory.collectAsState()
-    val selectedDateRange by viewModel.selectedDateRange.collectAsState()
-    val isLoadingMore by viewModel.isLoadingMore.collectAsState()
-    
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    
-    val lazyListState = rememberLazyListState()
-    val isNavVisible = lazyListState.isScrollingUp()
+    val liveData by mainViewModel.liveRestaurantData.collectAsState()
+    val userSession by mainViewModel.userSession.collectAsState()
+    val userProfileState by mainViewModel.userProfile.collectAsState()
+    val user = (userProfileState as? Resource.Success)?.data
+
+    val historyState by viewModel.historyState.collectAsState()
+    val selectedCategory by viewModel.selectedCategory.collectAsState()
+    val isLoadingMore by viewModel.isLoadingMore.collectAsState()
+
+    val isManager = userSession?.role?.uppercase() == "MANAGER"
 
     ScentGuardNavigationDrawer(
         user = user,
@@ -82,217 +81,132 @@ fun HistoryScreen(
             }
         }
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Scaffold(
-                topBar = {
-                    CenterAlignedTopAppBar(
-                        title = {
+        Scaffold(
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("System Logs", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                             Text(
-                                "System logs",
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold
+                                text = liveData?.name ?: "ScentGuard Monitor",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
                             )
-                        },
-                        navigationIcon = {
-                            IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                                Icon(Icons.Outlined.Menu, contentDescription = "Menu")
-                            }
-                        },
-                        actions = {
-                            if (user?.role?.uppercase() == "MANAGER") {
-                                var showDeleteAllDialog by remember { mutableStateOf(false) }
-                                
-                                if (showDeleteAllDialog) {
-                                    AlertDialog(
-                                        onDismissRequest = { showDeleteAllDialog = false },
-                                        title = { Text("Delete All Logs?") },
-                                        text = { Text("This will permanently remove all system logs for this restaurant. This action cannot be undone.") },
-                                        confirmButton = {
-                                            TextButton(
-                                                onClick = {
-                                                    viewModel.deleteAllLogs()
-                                                    showDeleteAllDialog = false
-                                                },
-                                                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                                            ) {
-                                                Text("Delete All", fontWeight = FontWeight.Bold)
-                                            }
-                                        },
-                                        dismissButton = {
-                                            TextButton(onClick = { showDeleteAllDialog = false }) {
-                                                Text("Cancel")
-                                            }
-                                        }
-                                    )
-                                }
-                                
-                                IconButton(onClick = { showDeleteAllDialog = true }) {
-                                    Icon(Icons.Outlined.DeleteSweep, contentDescription = "Delete All", tint = MaterialTheme.colorScheme.error)
-                                }
-                            }
-                            IconButton(onClick = { viewModel.fetchHistory() }) {
-                                Icon(Icons.Outlined.Refresh, contentDescription = "Refresh")
-                            }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = Color.Transparent
-                        )
-                    )
-                },
-                containerColor = MaterialTheme.colorScheme.background
-            ) { padding ->
-                var searchQuery by remember { mutableStateOf("") }
-                
-                Column(
-                    modifier = Modifier
-                        .padding(padding)
-                        .fillMaxSize()
-                ) {
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        modifier = Modifier
-                            .responsiveContainer(maxWidth = 480.dp)
-                            .padding(horizontal = 24.dp, vertical = 8.dp),
-                        placeholder = { Text("Search logs...") },
-                        leadingIcon = { Icon(Icons.Outlined.Search, null, tint = MaterialTheme.colorScheme.primary) },
-                        shape = RoundedCornerShape(20.dp),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)
-                        )
-                    )
-
-                    // Compact Filter Toolbar
-                    Row(
-                        modifier = Modifier
-                            .responsiveContainer(maxWidth = 480.dp)
-                            .padding(horizontal = 24.dp, vertical = 4.dp)
-                            .fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Category Dropdown
-                        var categoryExpanded by remember { mutableStateOf(false) }
-                        val categories = listOf("All", "Alerts", "Devices", "Fan", "Users", "System")
-                        
-                        Box(modifier = Modifier.weight(1f)) {
-                            OutlinedButton(
-                                onClick = { categoryExpanded = true },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text("Category: $selectedCategory", style = MaterialTheme.typography.bodySmall, maxLines = 1)
-                                    Icon(Icons.Outlined.ArrowDropDown, null, modifier = Modifier.size(18.dp))
-                                }
-                            }
-                            DropdownMenu(
-                                expanded = categoryExpanded,
-                                onDismissRequest = { categoryExpanded = false }
-                            ) {
-                                categories.forEach { cat ->
-                                    DropdownMenuItem(
-                                        text = { Text(cat) },
-                                        onClick = {
-                                            viewModel.setCategory(cat)
-                                            categoryExpanded = false
-                                        }
-                                    )
-                                }
-                            }
                         }
-
-                        // Date Range Dropdown
-                        var dateExpanded by remember { mutableStateOf(false) }
-                        val dateRanges = listOf("All", "Today", "Last 7 Days", "Last 30 Days")
-                        
-                        Box(modifier = Modifier.weight(1f)) {
-                            OutlinedButton(
-                                onClick = { dateExpanded = true },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text("Time: $selectedDateRange", style = MaterialTheme.typography.bodySmall, maxLines = 1)
-                                    Icon(Icons.Outlined.ArrowDropDown, null, modifier = Modifier.size(18.dp))
-                                }
-                            }
-                            DropdownMenu(
-                                expanded = dateExpanded,
-                                onDismissRequest = { dateExpanded = false }
-                            ) {
-                                dateRanges.forEach { range ->
-                                    DropdownMenuItem(
-                                        text = { Text(range) },
-                                        onClick = {
-                                            viewModel.setDateRange(range)
-                                            dateExpanded = false
-                                        }
-                                    )
-                                }
-                            }
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(Icons.Outlined.Menu, contentDescription = "Menu")
                         }
-                    }
-
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        when (val state = historyState) {
-                            is Resource.Loading -> {
-                                HistorySkeletonList()
-                            }
-                            is Resource.Success -> {
-                                val filteredItems = state.data?.filter { 
-                                    it.title.contains(searchQuery, ignoreCase = true) || 
-                                    it.description.contains(searchQuery, ignoreCase = true) 
-                                } ?: emptyList()
-                                HistoryList(
-                                    items = filteredItems, 
-                                    isLoadingMore = isLoadingMore,
-                                    isManager = user?.role?.uppercase() == "MANAGER",
-                                    lazyListState = lazyListState,
-                                    onLoadMore = { viewModel.loadNextPage() },
-                                    onDelete = { viewModel.deleteLog(it) }
+                    },
+                    actions = {
+                        if (isManager) {
+                            var showDeleteAllDialog by remember { mutableStateOf(false) }
+                            
+                            if (showDeleteAllDialog) {
+                                AlertDialog(
+                                    onDismissRequest = { showDeleteAllDialog = false },
+                                    title = { Text("Delete All Logs?") },
+                                    text = { Text("This action cannot be undone. All recorded history logs will be permanently removed.") },
+                                    confirmButton = {
+                                        TextButton(onClick = {
+                                            viewModel.deleteAllLogs()
+                                            showDeleteAllDialog = false
+                                        }) {
+                                            Text("Delete All", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                                        }
+                                    },
+                                    dismissButton = {
+                                        TextButton(onClick = { showDeleteAllDialog = false }) {
+                                            Text("Cancel")
+                                        }
+                                    }
                                 )
                             }
-                            is Resource.Error -> {
-                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text(text = state.message ?: "Unknown Error", color = MaterialTheme.colorScheme.error)
-                                        Button(onClick = { viewModel.fetchHistory() }, modifier = Modifier.padding(top = 16.dp)) {
-                                            Text("Retry")
-                                        }
+
+                            IconButton(onClick = { showDeleteAllDialog = true }) {
+                                Icon(Icons.Outlined.DeleteSweep, contentDescription = "Delete All", tint = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                        IconButton(onClick = { viewModel.fetchHistory() }) {
+                            Icon(Icons.Outlined.Refresh, contentDescription = "Refresh")
+                        }
+                    }
+                )
+            }
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            ) {
+                // Category Filter Chips
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = selectedCategory == "All",
+                        onClick = { viewModel.setCategory("All") },
+                        label = { Text("All") }
+                    )
+                    FilterChip(
+                        selected = selectedCategory == "ALERT",
+                        onClick = { viewModel.setCategory("ALERT") },
+                        label = { Text("Alerts") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.errorContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    )
+                    FilterChip(
+                        selected = selectedCategory == "WARNING",
+                        onClick = { viewModel.setCategory("WARNING") },
+                        label = { Text("Warnings") }
+                    )
+                    FilterChip(
+                        selected = selectedCategory == "INFO",
+                        onClick = { viewModel.setCategory("INFO") },
+                        label = { Text("Info") }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Box(modifier = Modifier.weight(1f)) {
+                    when (val state = historyState) {
+                        is Resource.Loading -> {
+                            HistorySkeletonList()
+                        }
+                        is Resource.Error -> {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(Icons.Outlined.ErrorOutline, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(48.dp))
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(state.message ?: "Failed to load history logs", color = MaterialTheme.colorScheme.error)
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Button(onClick = { viewModel.fetchHistory() }) {
+                                        Text("Retry")
                                     }
                                 }
                             }
-                            else -> {}
                         }
+                        is Resource.Success -> {
+                            val items = state.data ?: emptyList()
+                            HistoryList(
+                                items = items,
+                                isLoadingMore = isLoadingMore,
+                                isManager = isManager,
+                                onDelete = { viewModel.deleteLog(it) },
+                                onLoadMore = { viewModel.loadNextPage() }
+                            )
+                        }
+                        else -> {}
                     }
                 }
             }
-
-            ScentGuardFloatingNav(
-                user = user,
-                currentRoute = Screen.History.route,
-                isVisible = isNavVisible,
-                onNavigate = { route ->
-                    navController.navigate(route) {
-                        popUpTo(Screen.Dashboard.route) { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                }
-            )
         }
     }
 }
@@ -302,18 +216,19 @@ fun HistoryList(
     items: List<HistoryItem>,
     isLoadingMore: Boolean,
     isManager: Boolean,
-    lazyListState: LazyListState = rememberLazyListState(),
-    onLoadMore: () -> Unit,
-    onDelete: (HistoryItem) -> Unit
+    onDelete: (HistoryItem) -> Unit,
+    onLoadMore: () -> Unit
 ) {
+    val lazyListState = rememberLazyListState()
+
     if (items.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(
-                    Icons.Outlined.History, 
-                    null, 
+                    Icons.Outlined.HistoryToggleOff, 
+                    contentDescription = null, 
                     modifier = Modifier.size(64.dp), 
-                    tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
@@ -326,7 +241,7 @@ fun HistoryList(
                     "Your system events will appear here once monitoring begins.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    textAlign = TextAlign.Center,
                     modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp)
                 )
             }
@@ -418,7 +333,7 @@ fun HistoryCard(item: HistoryItem) {
     val containerBg = if (isStaffResponse) {
         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
     } else {
-        Color.Transparent
+        MaterialTheme.colorScheme.surface
     }
 
     Box(
@@ -543,11 +458,14 @@ fun SwipeToDeleteContainer(
         }
     )
 
+    val isSwiping = dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart || 
+                    dismissState.targetValue == SwipeToDismissBoxValue.EndToStart
+
     SwipeToDismissBox(
         state = dismissState,
         enableDismissFromStartToEnd = false,
         backgroundContent = {
-            val color = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
+            val color = if (isSwiping) {
                 MaterialTheme.colorScheme.errorContainer
             } else {
                 Color.Transparent
@@ -555,20 +473,27 @@ fun SwipeToDeleteContainer(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(24.dp))
+                    .clip(RoundedCornerShape(12.dp))
                     .background(color)
                     .padding(horizontal = 24.dp),
                 contentAlignment = Alignment.CenterEnd
             ) {
-                Icon(
-                    Icons.Outlined.Delete,
-                    contentDescription = "Delete",
-                    tint = MaterialTheme.colorScheme.onErrorContainer
-                )
+                if (isSwiping) {
+                    Icon(
+                        Icons.Outlined.Delete,
+                        contentDescription = "Delete",
+                        tint = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
             }
         },
         content = {
-            content()
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                content()
+            }
         }
     )
 }
