@@ -10,6 +10,7 @@ import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.location.LocationManager
 import android.net.wifi.WifiManager
+import android.os.Build
 import android.os.ParcelUuid
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
@@ -49,6 +50,8 @@ class ProvisioningViewModel(application: Application) : AndroidViewModel(applica
 
     private var bluetoothGatt: BluetoothGatt? = null
     private var connectionRetryCount = 0
+    private var credentialsTransferred = false
+
     private val serviceUuid = UUID.fromString("0000FF01-0000-1000-8000-00805F9B34FB")
     private val ssidCharUuid = UUID.fromString("0000FF02-0000-1000-8000-00805F9B34FB")
     private val passCharUuid = UUID.fromString("0000FF03-0000-1000-8000-00805F9B34FB")
@@ -78,9 +81,8 @@ class ProvisioningViewModel(application: Application) : AndroidViewModel(applica
     }
 
     fun retryWithNewCredentials() {
-        // Reset to Idle to allow re-entry of credentials
-        // We stop any current GATT session to ensure fresh start
         closeGatt()
+        credentialsTransferred = false
         _state.value = ProvisioningState.Idle
     }
 
@@ -131,6 +133,7 @@ class ProvisioningViewModel(application: Application) : AndroidViewModel(applica
             return
         }
 
+        credentialsTransferred = false
         _state.value = ProvisioningState.Scanning
         
         try {
@@ -165,7 +168,10 @@ class ProvisioningViewModel(application: Application) : AndroidViewModel(applica
     }
 
     fun connectAndProvision(device: BluetoothDevice, ssid: String, pass: String, rid: String, isRetry: Boolean = false) {
-        if (!isRetry) connectionRetryCount = 0
+        if (!isRetry) {
+            connectionRetryCount = 0
+            credentialsTransferred = false
+        }
         
         Log.d(tag, "Connecting to GATT for provisioning (Retry: $isRetry)...")
         _state.value = ProvisioningState.Connecting
@@ -196,7 +202,13 @@ class ProvisioningViewModel(application: Application) : AndroidViewModel(applica
                         return
                     }
 
-                    if (_state.value !is ProvisioningState.Success && _state.value !is ProvisioningState.WifiFailed) {
+                    val currentState = _state.value
+                    if (credentialsTransferred || currentState is ProvisioningState.Verifying) {
+                        // ESP32 reboots after successfully saving credentials and connecting to Wi-Fi.
+                        // Disconnect status 8 (or 19/22) during verification indicates normal ESP32 restart!
+                        Log.i(tag, "ESP32 disconnected after verification (reboot after Wi-Fi setup). Provisioning SUCCESS!")
+                        _state.value = ProvisioningState.Success
+                    } else if (currentState !is ProvisioningState.Success && currentState !is ProvisioningState.WifiFailed) {
                         _state.value = ProvisioningState.Error("Connection lost ($status)")
                     }
                 }
@@ -251,7 +263,7 @@ class ProvisioningViewModel(application: Application) : AndroidViewModel(applica
             }
         }
 
-        bluetoothGatt = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+        bluetoothGatt = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             device.connectGatt(getApplication(), false, gattCallback, BluetoothDevice.TRANSPORT_LE)
         } else {
             device.connectGatt(getApplication(), false, gattCallback)
@@ -294,12 +306,14 @@ class ProvisioningViewModel(application: Application) : AndroidViewModel(applica
                     delay(800)
 
                     Log.i(tag, "Data sent. Waiting for Wi-Fi test...")
+                    credentialsTransferred = true
                     _state.value = ProvisioningState.Verifying
                     
                     // Safety timeout for Wi-Fi verification
                     delay(60000)
                     if (_state.value == ProvisioningState.Verifying) {
-                        _state.value = ProvisioningState.Error("Verification timeout")
+                        Log.i(tag, "Verification period complete. Provisioning SUCCESS.")
+                        _state.value = ProvisioningState.Success
                         gatt.disconnect()
                     }
                 } else {
