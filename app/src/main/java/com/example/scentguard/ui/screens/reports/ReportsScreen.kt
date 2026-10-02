@@ -1,5 +1,7 @@
 package com.example.scentguard.ui.screens.reports
 
+import android.app.Application
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -16,21 +18,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.scentguard.data.model.ChartData
 import com.example.scentguard.data.model.ReportSummary
+import com.example.scentguard.data.model.Restaurant
 import com.example.scentguard.navigation.Screen
-import com.example.scentguard.ui.components.ScentGuardChart
 import com.example.scentguard.ui.components.ScentGuardCard
+import com.example.scentguard.ui.components.ScentGuardChart
 import com.example.scentguard.ui.components.ScentGuardFloatingNav
 import com.example.scentguard.ui.components.ScentGuardNavigationDrawer
 import com.example.scentguard.ui.theme.ErrorRed
@@ -50,7 +54,7 @@ import kotlinx.coroutines.launch
 fun ReportsScreen(
     navController: NavHostController,
     mainViewModel: MainViewModel,
-    viewModel: ReportViewModel = viewModel(factory = ViewModelFactory(LocalContext.current.applicationContext as android.app.Application))
+    viewModel: ReportViewModel = viewModel(factory = ViewModelFactory(LocalContext.current.applicationContext as Application))
 ) {
     val userProfileResource by mainViewModel.userProfile.collectAsState()
     val user = (userProfileResource as? Resource.Success)?.data
@@ -60,6 +64,9 @@ fun ReportsScreen(
     val computedSummary by viewModel.computedSummary.collectAsState()
     val liveData by mainViewModel.liveRestaurantData.collectAsState()
     
+    val warnThreshold = (liveData?.thresholdWarn ?: 1000).toFloat()
+    val dangerThreshold = (liveData?.thresholdDanger ?: 1500).toFloat()
+    
     var selectedTab by remember { mutableIntStateOf(0) }
     
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -67,6 +74,15 @@ fun ReportsScreen(
     
     val scrollState = rememberScrollState()
     val isNavVisible = scrollState.isScrollingUp()
+
+    // Sync chart & calculations whenever active thresholds change in settings
+    LaunchedEffect(warnThreshold, dangerThreshold) {
+        if (selectedTab == 0) {
+            viewModel.fetchChartData(isWeekly = false, warnThreshold = warnThreshold.toInt(), dangerThreshold = dangerThreshold.toInt())
+        } else {
+            viewModel.fetchChartData(isWeekly = true, warnThreshold = warnThreshold.toInt(), dangerThreshold = dangerThreshold.toInt())
+        }
+    }
 
     ScentGuardNavigationDrawer(
         user = user,
@@ -94,7 +110,7 @@ fun ReportsScreen(
                     CenterAlignedTopAppBar(
                         title = {
                             Text(
-                                "Analytics",
+                                "Reports & Analytics",
                                 style = MaterialTheme.typography.headlineMedium,
                                 fontWeight = FontWeight.Bold
                             )
@@ -120,7 +136,7 @@ fun ReportsScreen(
                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                         color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f),
                         shape = CircleShape,
-                        border = androidx.compose.foundation.BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.05f))
+                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.05f))
                     ) {
                         TabRow(
                             selectedTabIndex = selectedTab,
@@ -133,7 +149,6 @@ fun ReportsScreen(
                                             .tabIndicatorOffset(tabPositions[selectedTab])
                                             .fillMaxHeight()
                                             .padding(4.dp)
-                                            // Ensure the indicator is behind the text
                                             .zIndex(-1f)
                                             .background(MaterialTheme.colorScheme.surface, CircleShape)
                                             .shadow(2.dp, CircleShape)
@@ -146,10 +161,11 @@ fun ReportsScreen(
                                 onClick = { 
                                     selectedTab = 0 
                                     viewModel.fetchDailyReport()
+                                    viewModel.fetchChartData(isWeekly = false, warnThreshold = warnThreshold.toInt(), dangerThreshold = dangerThreshold.toInt())
                                 },
                                 text = { 
                                     Text(
-                                        text = "Daily", 
+                                        text = "Daily View", 
                                         fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Medium
                                     ) 
                                 },
@@ -161,10 +177,11 @@ fun ReportsScreen(
                                 onClick = { 
                                     selectedTab = 1 
                                     viewModel.fetchWeeklyReport()
+                                    viewModel.fetchChartData(isWeekly = true, warnThreshold = warnThreshold.toInt(), dangerThreshold = dangerThreshold.toInt())
                                 },
                                 text = { 
                                     Text(
-                                        text = "Weekly", 
+                                        text = "Weekly View", 
                                         fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Medium
                                     ) 
                                 },
@@ -180,11 +197,18 @@ fun ReportsScreen(
                                 ReportSkeleton()
                             }
                             is Resource.Success -> {
-                                ReportContent(computedSummary, chartState, liveData, scrollState)
+                                ReportContent(
+                                    report = computedSummary,
+                                    chartState = chartState,
+                                    liveData = liveData,
+                                    warnThreshold = warnThreshold,
+                                    dangerThreshold = dangerThreshold,
+                                    scrollState = scrollState
+                                )
                             }
                             is Resource.Error -> {
                                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text(text = state.message ?: "Error", color = MaterialTheme.colorScheme.error)
+                                    Text(text = state.message ?: "Error loading report", color = MaterialTheme.colorScheme.error)
                                 }
                             }
                             else -> {}
@@ -213,7 +237,9 @@ fun ReportsScreen(
 fun ReportContent(
     report: ReportSummary, 
     chartState: Resource<ChartData>, 
-    liveData: com.example.scentguard.data.model.Restaurant?,
+    liveData: Restaurant?,
+    warnThreshold: Float,
+    dangerThreshold: Float,
     scrollState: ScrollState = rememberScrollState()
 ) {
     Column(
@@ -223,69 +249,92 @@ fun ReportContent(
             .verticalScroll(scrollState)
             .responsiveContainer(maxWidth = 600.dp)
     ) {
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
         
+        // Non-Technical Sensitivity Configuration Summary Banner
+        SensitivityConfigCard(warnThreshold.toInt(), dangerThreshold.toInt())
+
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Air Quality Score Card
         ScoreCard(report.airQualityScore)
         
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        // Heads-Up Display: Current PPM and Status
+        // Real-time Status Card with Non-technical guidance
         ScentGuardCard(
             modifier = Modifier.fillMaxWidth(),
             contentPadding = 20.dp
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text(
-                        text = "Real-time concentration", 
-                        style = MaterialTheme.typography.labelMedium, 
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "${liveData?.currentGasPpm ?: 0} ppm",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.primary,
-                        letterSpacing = (-1).sp
-                    )
-                }
-                
-                val airStatus = liveData?.airStatus ?: "SAFE"
-                val statusColor = when (airStatus.uppercase()) {
-                    "SAFE" -> Color(0xFF34C759)
-                    "WARN" -> Color(0xFFFF9500)
-                    "DANGER" -> Color(0xFFFF3B30)
-                    else -> Color(0xFF34C759)
-                }
-                
-                Surface(
-                    color = statusColor.copy(alpha = 0.1f),
-                    shape = RoundedCornerShape(12.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, statusColor.copy(alpha = 0.2f))
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        text = airStatus.uppercase(),
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Black,
-                        color = statusColor
-                    )
+                    Column {
+                        Text(
+                            text = "Live Gas Level", 
+                            style = MaterialTheme.typography.labelMedium, 
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "${liveData?.currentGasPpm ?: 0} ppm",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Black,
+                            color = MaterialTheme.colorScheme.primary,
+                            letterSpacing = (-1).sp
+                        )
+                    }
+                    
+                    val airStatus = liveData?.airStatus ?: "SAFE"
+                    val statusColor = when (airStatus.uppercase()) {
+                        "SAFE" -> Color(0xFF34C759)
+                        "WARN" -> Color(0xFFFF9500)
+                        "DANGER" -> Color(0xFFFF3B30)
+                        else -> Color(0xFF34C759)
+                    }
+                    
+                    Surface(
+                        color = statusColor.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(12.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, statusColor.copy(alpha = 0.2f))
+                    ) {
+                        Text(
+                            text = airStatus.uppercase(),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Black,
+                            color = statusColor
+                        )
+                    }
                 }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // Plain-English status description
+                val statusDescription = when ((liveData?.airStatus ?: "SAFE").uppercase()) {
+                    "SAFE" -> "Air quality is clean and well within safe limits."
+                    "WARN" -> "Gas level elevated (above ${warnThreshold.toInt()} ppm). Automated fan is active."
+                    "DANGER" -> "High gas concentration! Level crossed danger limit (${dangerThreshold.toInt()} ppm)."
+                    else -> "Air quality is within normal parameters."
+                }
+                Text(
+                    text = statusDescription,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                )
             }
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(28.dp))
         
         Text(
-            text = "Odor Concentration Trend", 
+            text = "Odor & Gas Trend Analysis", 
             style = MaterialTheme.typography.titleLarge, 
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 16.dp)
+            modifier = Modifier.padding(bottom = 12.dp)
         )
         
         ScentGuardCard(
@@ -300,12 +349,16 @@ fun ReportContent(
                             Box(modifier = Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Icon(Icons.Outlined.SsidChart, null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-                                    Text("Insufficient data", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.outline)
-                                    Text("Ensure hardware is online", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f))
+                                    Text("Insufficient chart data", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.outline)
+                                    Text("Connecting to sensor history...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f))
                                 }
                             }
                         } else {
-                            ScentGuardChart(chartState.data!!)
+                            ScentGuardChart(
+                                data = chartState.data!!,
+                                warnThreshold = warnThreshold,
+                                dangerThreshold = dangerThreshold
+                            )
                         }
                     }
                     is Resource.Error -> Text("Failed to load chart", color = MaterialTheme.colorScheme.error)
@@ -314,33 +367,94 @@ fun ReportContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
-        // System Explanation Text
         Text(
-            text = "Monitoring shows changes in detected gas levels. SAFE indicates normal conditions, WARN indicates attention may be needed, and DANGER indicates immediate action. Optimized for ScentGuard MQ135 calibration.",
+            text = "Note: The chart background colors match your active gas sensitivity settings configured in Settings.",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 16.dp)
+            modifier = Modifier.padding(horizontal = 8.dp)
         )
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(28.dp))
         
         Text(
-            text = "Insights summary", 
+            text = "Key Insights & Summary", 
             style = MaterialTheme.typography.titleLarge, 
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 16.dp)
+            modifier = Modifier.padding(bottom = 12.dp)
         )
         
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            ReportMetricItem("Average Gas", report.avgGasLevel, Icons.Outlined.Cloud, PremiumGreen)
-            ReportMetricItem("Fan Activity", report.totalFanRuntime, Icons.Outlined.Timer, WarningOrange)
-            ReportMetricItem("Critical Alerts", report.alertsCount.toString(), Icons.Outlined.Warning, ErrorRed)
+            ReportMetricItem(
+                label = "Average Gas Concentration",
+                value = report.avgGasLevel,
+                description = "Average odor/gas concentration during this period",
+                icon = Icons.Outlined.Cloud,
+                color = PremiumGreen
+            )
+            ReportMetricItem(
+                label = "Automated Fan Runtime",
+                value = report.totalFanRuntime,
+                description = "Total time the ventilation fan ran automatically",
+                icon = Icons.Outlined.Timer,
+                color = WarningOrange
+            )
+            ReportMetricItem(
+                label = "High Gas Incidents",
+                value = report.alertsCount.toString(),
+                description = "Times reading crossed your danger limit (${dangerThreshold.toInt()} ppm)",
+                icon = Icons.Outlined.Warning,
+                color = ErrorRed
+            )
         }
         
         Spacer(modifier = Modifier.height(120.dp))
+    }
+}
+
+@Composable
+fun SensitivityConfigCard(warnThreshold: Int, dangerThreshold: Int) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f),
+        border = androidx.compose.foundation.BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                modifier = Modifier.size(40.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Outlined.Tune,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = "Active Sensitivity Settings",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                Text(
+                    text = "Warning: $warnThreshold ppm • Danger: $dangerThreshold ppm",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                )
+            }
+        }
     }
 }
 
@@ -361,66 +475,109 @@ fun ReportSkeleton() {
 fun ScoreCard(score: Int) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(32.dp),
+        shape = RoundedCornerShape(28.dp),
         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
     ) {
         Row(
-            modifier = Modifier.padding(28.dp),
+            modifier = Modifier.padding(24.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("Performance Index", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    text = "Air Quality Health Index", 
+                    style = MaterialTheme.typography.labelLarge, 
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
                 Text(
                     text = when {
-                        score > 90 -> "Excellent"
-                        score > 70 -> "Good"
-                        else -> "Stabilizing"
+                        score > 90 -> "Optimal — Clean & Safe"
+                        score > 70 -> "Good — Stable Air"
+                        else -> "Attention Needed"
                     },
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
+                Text(
+                    text = when {
+                        score > 90 -> "Air quality is safe and clean."
+                        score > 70 -> "Minor odor detected; ventilation handled smoothly."
+                        else -> "Frequent elevated gas levels detected."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(top = 4.dp)
+                )
             }
+            Spacer(modifier = Modifier.width(12.dp))
             Box(contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(
                     progress = { score / 100f },
-                    modifier = Modifier.size(84.dp),
+                    modifier = Modifier.size(80.dp),
                     color = MaterialTheme.colorScheme.primary,
                     strokeWidth = 8.dp,
                     trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                    strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
+                    strokeCap = StrokeCap.Round
                 )
-                Text(text = "$score", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    text = "$score", 
+                    style = MaterialTheme.typography.titleLarge, 
+                    fontWeight = FontWeight.Black, 
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
         }
     }
 }
 
 @Composable
-fun ReportMetricItem(label: String, value: String, icon: ImageVector, color: Color) {
+fun ReportMetricItem(
+    label: String, 
+    value: String, 
+    description: String,
+    icon: ImageVector, 
+    color: Color
+) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
     ) {
         Row(
-            modifier = Modifier.padding(20.dp),
+            modifier = Modifier.padding(18.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
                 modifier = Modifier.size(44.dp),
-                color = color.copy(alpha = 0.05f),
+                color = color.copy(alpha = 0.08f),
                 shape = CircleShape
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(icon, null, tint = color, modifier = Modifier.size(22.dp))
+                    Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
                 }
             }
             Spacer(modifier = Modifier.width(16.dp))
-            Text(text = label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-            Text(text = value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = label, 
+                    style = MaterialTheme.typography.bodyLarge, 
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = description, 
+                    style = MaterialTheme.typography.bodySmall, 
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = value, 
+                style = MaterialTheme.typography.titleLarge, 
+                fontWeight = FontWeight.Black
+            )
         }
     }
 }

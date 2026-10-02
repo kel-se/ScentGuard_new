@@ -1,14 +1,20 @@
 package com.example.scentguard.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -24,29 +30,37 @@ import kotlin.math.roundToInt
 fun ScentGuardChart(
     data: ChartData,
     modifier: Modifier = Modifier,
-    lineColor: Color = MaterialTheme.colorScheme.primary
+    lineColor: Color = MaterialTheme.colorScheme.primary,
+    warnThreshold: Float = 1000f,
+    dangerThreshold: Float = 1500f
 ) {
     var selectedIndex by remember { mutableStateOf(-1) }
 
-    // Constants for visualization
-    val maxPpm = 2000f
-    val safeLimit = 1000f
-    val dangerLimit = 1500f
+    // Threshold boundaries
+    val safeLimit = warnThreshold
+    val dangerLimit = dangerThreshold
     
-    // Minimal horizontal margin to prevent edge clipping
+    // Dynamic max PPM based on thresholds and maximum data point
+    val maxDataPoint = data.points.maxOfOrNull { it.y } ?: 0f
+    val maxPpm = maxOf(2000f, dangerLimit * 1.25f, maxDataPoint * 1.15f)
+    
     val horizontalMargin = 12.dp
 
     Column(modifier = modifier) {
+        // Chart Header & Inspection Details
         Row(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
                 Text(
                     "Odor Concentration Trend",
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 if (data.points.isNotEmpty() && selectedIndex != -1) {
                     val point = data.points[selectedIndex]
@@ -55,29 +69,37 @@ fun ScentGuardChart(
                         point.y < dangerLimit -> "WARN"
                         else -> "DANGER"
                     }
+                    val statusColor = when (status) {
+                        "SAFE" -> Color(0xFF34C759)
+                        "WARN" -> Color(0xFFFF9500)
+                        else -> Color(0xFFFF3B30)
+                    }
                     Text(
                         text = "${point.y.roundToInt()} ppm ($status) at ${point.label}",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = lineColor,
+                        color = statusColor,
                         fontWeight = FontWeight.Bold
                     )
                 } else if (data.points.size > 1) {
                     Text(
-                        "Scrub chart for details",
+                        "Tap or drag along line to inspect exact readings",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
                 }
             }
         }
 
+        // Main Chart Canvas
         Box(
-            modifier = Modifier.fillMaxWidth().height(220.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(220.dp),
             contentAlignment = Alignment.Center
         ) {
             if (data.points.size < 2) {
                 Text(
-                    text = if (data.points.isEmpty()) "Waiting for sensor data..." else "Collecting more points...",
+                    text = if (data.points.isEmpty()) "Waiting for sensor data..." else "Collecting more data points...",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.outline
                 )
@@ -109,15 +131,14 @@ fun ScentGuardChart(
                     val minVal = 0f
                     val scaleRange = maxPpm - minVal
                     
-                    // Helper to get Y coordinate for a PPM value
                     fun getY(ppm: Float) = height - ((ppm - minVal) / scaleRange) * height
 
-                    // 1. Draw Threshold Zones (Background)
-                    // SAFE Zone (Emerald tint)
+                    // 1. Draw Threshold Zones (Background Tints)
+                    // SAFE Zone (Green tint)
                     drawRect(
                         color = Color(0xFF34C759).copy(alpha = 0.06f),
                         topLeft = Offset(0f, getY(safeLimit)),
-                        size = androidx.compose.ui.geometry.Size(width, height - getY(safeLimit))
+                        size = Size(width, height - getY(safeLimit))
                     )
                     // WARN Zone (Orange tint)
                     drawRect(
@@ -132,11 +153,22 @@ fun ScentGuardChart(
                         size = androidx.compose.ui.geometry.Size(width, getY(dangerLimit))
                     )
 
-                    // 2. Draw Grid Lines at Thresholds
-                    val gridAlpha = 0.05f
-                    drawLine(Color.Gray.copy(alpha = gridAlpha), Offset(0f, getY(safeLimit)), Offset(width, getY(safeLimit)), strokeWidth = 1.dp.toPx())
-                    drawLine(Color.Gray.copy(alpha = gridAlpha), Offset(0f, getY(dangerLimit)), Offset(width, getY(dangerLimit)), strokeWidth = 1.dp.toPx())
+                    // 2. Draw Threshold Lines
+                    val gridAlpha = 0.25f
+                    drawLine(
+                        color = Color(0xFFFF9500).copy(alpha = gridAlpha),
+                        start = Offset(0f, getY(safeLimit)),
+                        end = Offset(width, getY(safeLimit)),
+                        strokeWidth = 1.dp.toPx()
+                    )
+                    drawLine(
+                        color = Color(0xFFFF3B30).copy(alpha = gridAlpha),
+                        start = Offset(0f, getY(dangerLimit)),
+                        end = Offset(width, getY(dangerLimit)),
+                        strokeWidth = 1.dp.toPx()
+                    )
 
+                    // 3. Construct Smooth Cubic Bezier Line
                     val path = Path()
                     val fillPath = Path()
                     
@@ -151,11 +183,8 @@ fun ScentGuardChart(
                         } else {
                             val prevX = marginPx + (i - 1) * spacing
                             val prevY = getY(data.points[i - 1].y).coerceIn(0f, height)
-                            
-                            // Cubic curve for ultra-smooth line
                             val cp1X = prevX + (x - prevX) / 2
                             path.cubicTo(cp1X, prevY, cp1X, y, x, y)
-                            
                             fillPath.cubicTo(cp1X, prevY, cp1X, y, x, y)
                         }
                         
@@ -165,25 +194,25 @@ fun ScentGuardChart(
                         }
                     }
 
-                    // 3. Draw Area Fill
+                    // 4. Area Fill
                     drawPath(
                         path = fillPath,
                         brush = Brush.verticalGradient(
                             colors = listOf(
-                                lineColor.copy(alpha = 0.15f),
+                                lineColor.copy(alpha = 0.2f),
                                 Color.Transparent
                             )
                         )
                     )
 
-                    // 4. Draw Trend Line
+                    // 5. Trend Line
                     drawPath(
                         path = path,
                         color = lineColor,
                         style = Stroke(width = 2.5.dp.toPx())
                     )
                     
-                    // 5. Scrubbing Indicator
+                    // 6. Scrubbing Touch Indicator
                     if (selectedIndex != -1) {
                         val scrubX = marginPx + selectedIndex * spacing
                         val scrubY = getY(data.points[selectedIndex].y).coerceIn(0f, height)
@@ -191,7 +220,7 @@ fun ScentGuardChart(
                             color = lineColor.copy(alpha = 0.5f),
                             start = Offset(scrubX, 0f),
                             end = Offset(scrubX, height),
-                            strokeWidth = 1.dp.toPx()
+                            strokeWidth = 1.5.dp.toPx()
                         )
                         drawCircle(
                             color = lineColor,
@@ -203,10 +232,10 @@ fun ScentGuardChart(
             }
         }
         
+        // Time Axis Labels
         if (data.points.size > 1) {
             BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
                 val availableWidth = maxWidth
-                // Estimate label width needs (including some gap)
                 val minLabelWidth = 72.dp 
                 val maxVisibleLabels = (availableWidth / minLabelWidth).toInt().coerceAtLeast(2)
                 val step = (data.points.size / maxVisibleLabels).coerceAtLeast(1)
@@ -230,5 +259,62 @@ fun ScentGuardChart(
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Non-Technical Color Legend for Sensitivity Settings
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = "Chart Color Guide (Sensitivity Active)",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ChartLegendItem(
+                        color = Color(0xFF34C759),
+                        label = "Safe (<${warnThreshold.toInt()} ppm)"
+                    )
+                    ChartLegendItem(
+                        color = Color(0xFFFF9500),
+                        label = "Warn (${warnThreshold.toInt()}–${dangerThreshold.toInt()} ppm)"
+                    )
+                    ChartLegendItem(
+                        color = Color(0xFFFF3B30),
+                        label = "Danger (>${dangerThreshold.toInt()} ppm)"
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChartLegendItem(color: Color, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .background(color, CircleShape)
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

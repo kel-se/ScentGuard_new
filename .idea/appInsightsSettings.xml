@@ -6,14 +6,6 @@
         <entry key="Firebase Crashlytics">
           <value>
             <InsightsFilterSettings>
-              <option name="connection">
-                <ConnectionSetting>
-                  <option name="appId" value="com.example.scentguard" />
-                  <option name="mobileSdkAppId" value="1:75241057260:android:93d85d5a2ce63c36b2aec9" />
-                  <option name="projectId" value="scentguard-4thyear" />
-                  <option name="projectNumber" value="75241057260" />
-                </ConnectionSetting>
-              </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />
               <option name="timeIntervalDays" value="THIRTY_DAYS" />
               <option name="visibilityType" value="ALL" />

@@ -52,54 +52,80 @@ class ReportViewModel(
         }
     }
 
-    fun fetchChartData(isWeekly: Boolean = false, restaurantId: String? = null) {
+    fun fetchChartData(
+        isWeekly: Boolean = false,
+        restaurantId: String? = null,
+        warnThreshold: Int = 1000,
+        dangerThreshold: Int = 1500
+    ) {
         val rid = restaurantId ?: authRepository.userSession.value?.restaurantId ?: return
         viewModelScope.launch {
             _chartState.value = Resource.Loading()
             val result = chartRepository.getGasLevelHistory(rid, isWeekly)
             result.onSuccess { data ->
                 _chartState.value = Resource.Success(data)
-                computeSummaryFromData(data, rid, isWeekly)
+                computeSummaryFromData(data, rid, isWeekly, warnThreshold, dangerThreshold)
             }.onFailure {
                 _chartState.value = Resource.Error(it.message ?: "Failed to load chart")
             }
         }
     }
 
-    private fun computeSummaryFromData(data: ChartData, rid: String, isWeekly: Boolean = false) {
+    private fun computeSummaryFromData(
+        data: ChartData,
+        rid: String,
+        isWeekly: Boolean = false,
+        warnThreshold: Int = 1000,
+        dangerThreshold: Int = 1500
+    ) {
         viewModelScope.launch {
             val points = data.points
             if (points.isEmpty()) {
                 _computedSummary.value = ReportSummary(
                     avgGasLevel = "0 ppm",
                     totalFanRuntime = "0m",
-                    airQualityScore = 0,
+                    airQualityScore = 100,
                     alertsCount = 0,
                     period = if (isWeekly) "Weekly" else "Daily"
                 )
                 return@launch
             }
 
+            // Fetch actual active thresholds from Firestore if defaults were passed
+            var warnT = warnThreshold
+            var dangerT = dangerThreshold
+            try {
+                val db = FirebaseFirestore.getInstance()
+                val restDoc = db.collection("restaurants").document(rid).get().await()
+                if (restDoc.exists()) {
+                    warnT = restDoc.getLong("thresholdWarn")?.toInt() ?: warnThreshold
+                    dangerT = restDoc.getLong("thresholdDanger")?.toInt() ?: dangerThreshold
+                }
+            } catch (_: Exception) {
+                // Fallback to supplied thresholds
+            }
+
             // 1. Average Gas
             val avgGas = points.map { it.y }.average().toInt()
 
-            // 2. Total Alerts
-            val dangerSnapshots = points.count { it.y >= 1500f }
+            // 2. Total Alerts matching sensitivity setting
+            val dangerSnapshots = points.count { it.y >= dangerT.toFloat() }
+            val warnSnapshots = points.count { it.y >= warnT.toFloat() && it.y < dangerT.toFloat() }
             val totalSnapshots = points.size
 
-            // 3. Performance Index
+            // 3. Air Quality Score based on active sensitivity limits
             val performanceScore = if (totalSnapshots > 0) {
-                (100 - (dangerSnapshots.toFloat() / totalSnapshots * 100)).toInt()
-            } else 0
+                (100 - ((dangerSnapshots * 1.0f + warnSnapshots * 0.3f) / totalSnapshots * 100)).toInt().coerceIn(0, 100)
+            } else 100
 
             // 4. Fan Runtime
             var totalMinutes = 0
-            val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+            val db = FirebaseFirestore.getInstance()
             try {
                 val limit = if (isWeekly) 1000 else 96
                 val snapshot = db.collection("restaurants").document(rid)
                     .collection("sensor_history")
-                    .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                    .orderBy("timestamp", Query.Direction.DESCENDING)
                     .limit(limit.toLong())
                     .get()
                     .await()
@@ -109,7 +135,7 @@ class ReportViewModel(
                         totalMinutes += 15
                     }
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Fallback
             }
 
