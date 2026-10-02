@@ -56,7 +56,11 @@ class HistoryRepository(
                         "Fan" -> item.eventType == "FAN_ON" || item.eventType == "FAN_OFF"
                         "Devices" -> item.eventType == "DEVICE_CONNECT" || item.eventType == "DEVICE_DISCONNECT"
                         "Users" -> listOf("USER_LOGIN", "USER_CHANGE", "MEMBER_JOIN", "MEMBER_REMOVE").contains(item.eventType)
-                        "System" -> listOf("SYSTEM_START", "SYSTEM_UPDATE", "AIR_SAFE").contains(item.eventType)
+                        "System" -> listOf("SYSTEM_START", "SYSTEM_UPDATE", "AIR_SAFE", "SANITATION_START", "SANITATION_END", "SANITATION_CYCLE").contains(item.eventType) ||
+                                item.eventType.contains("PUMP", ignoreCase = true) ||
+                                item.eventType.contains("SANITATION", ignoreCase = true) ||
+                                item.title.contains("Sanitation", ignoreCase = true) ||
+                                item.title.contains("Pump", ignoreCase = true)
                         else -> true
                     }
                 }.take(limit.toInt())

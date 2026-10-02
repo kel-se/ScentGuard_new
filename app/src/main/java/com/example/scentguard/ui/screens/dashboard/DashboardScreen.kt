@@ -166,8 +166,7 @@ fun DashboardScreen(
                     item {
                         MetricsGrid(
                             gasLevel = if (isOnline) liveData?.currentGasPpm ?: 0 else 0,
-                            pumpStatus = liveData?.pumpStatus ?: "OFF",
-                            onPumpClick = { navController.navigate(Screen.SanitationPump.route) }
+                            pumpStatus = liveData?.pumpStatus ?: "OFF"
                         )
                     }
 
@@ -428,8 +427,7 @@ fun AirQualityHero(
 @Composable
 fun MetricsGrid(
     gasLevel: Int,
-    pumpStatus: String = "OFF",
-    onPumpClick: () -> Unit
+    pumpStatus: String = "OFF"
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
         Text(
@@ -452,7 +450,7 @@ fun MetricsGrid(
                 value = if (pumpStatus == "ON") "Spraying" else "Standby",
                 unit = "",
                 icon = Icons.Outlined.Opacity,
-                modifier = Modifier.weight(1f).clickable { onPumpClick() },
+                modifier = Modifier.weight(1f),
                 valueStyle = MaterialTheme.typography.headlineMedium,
                 valueColor = if (pumpStatus == "ON") Color(0xFF34C759) else MaterialTheme.colorScheme.onSurfaceVariant
             )

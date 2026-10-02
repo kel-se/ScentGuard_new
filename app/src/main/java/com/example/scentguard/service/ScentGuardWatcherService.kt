@@ -29,6 +29,7 @@ class ScentGuardWatcherService : Service() {
     private var listenerRegistration: ListenerRegistration? = null
     private var lastKnownAirStatus: String? = null
     private var lastKnownFanStatus: String? = null
+    private var lastKnownPumpStatus: String? = null
     
     private var isAlarmAcknowledged = false
     
@@ -98,6 +99,8 @@ class ScentGuardWatcherService : Service() {
                 if (snapshot != null && snapshot.exists()) {
                     val fanStatus = snapshot.getString("fanStatus") ?: "OFF"
                     val fanMode = snapshot.getString("fanMode") ?: "AUTO"
+                    val pumpStatus = snapshot.getString("pumpStatus") ?: "OFF"
+                    val pumpMode = snapshot.getString("pumpMode") ?: "AUTO"
                     val gasPpm = snapshot.getLong("currentGasPpm") ?: 0
                     val lastSeen = snapshot.getTimestamp("lastSeen")
                     
@@ -144,9 +147,16 @@ class ScentGuardWatcherService : Service() {
                         lastKnownFanStatus = fanStatus
                         handleFanStatusTransition(restaurantId, fanStatus, fanMode, gasPpm.toInt(), lastSeen)
                     }
+
+                    // 3. Pump Status Transitions
+                    if (lastKnownPumpStatus != null && lastKnownPumpStatus != pumpStatus) {
+                        lastKnownPumpStatus = pumpStatus
+                        handlePumpStatusTransition(restaurantId, pumpStatus, pumpMode, gasPpm.toInt(), lastSeen)
+                    }
                     
                     lastKnownAirStatus = currentAirStatus
                     lastKnownFanStatus = fanStatus
+                    lastKnownPumpStatus = pumpStatus
                 }
             }
     }
@@ -199,6 +209,17 @@ class ScentGuardWatcherService : Service() {
         } else if (new == "OFF") {
             val source = if (mode == "OFF") "MANUAL" else "AUTOMATIC"
             logEvent(rid, "FAN_OFF", "Ventilation Stopped", "Air quality stabilized", HistoryType.INFO, ppm, source, ts)
+        }
+    }
+
+    private fun handlePumpStatusTransition(rid: String, new: String, mode: String, ppm: Int, ts: Timestamp?) {
+        if (new == "ON") {
+            val source = if (mode == "ON") "MANUAL" else "AUTOMATIC"
+            val desc = if (mode == "ON") "Manual sanitation cycle triggered" else "Automatic sanitation cycle active"
+            logEvent(rid, "SANITATION_START", "Sanitation Pump Activated", desc, HistoryType.INFO, ppm, source, ts)
+        } else if (new == "OFF") {
+            val source = if (mode == "OFF") "MANUAL" else "AUTOMATIC"
+            logEvent(rid, "SANITATION_END", "Sanitation Pump Completed", "Sanitation cycle finished", HistoryType.SUCCESS, ppm, source, ts)
         }
     }
 
