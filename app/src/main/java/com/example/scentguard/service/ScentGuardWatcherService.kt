@@ -117,8 +117,16 @@ class ScentGuardWatcherService : Service() {
                         gasPpm >= tWarn -> "WARN"
                         else -> "SAFE"
                     }
+
+                    // Initialize baseline status on first snapshot to prevent false alarms on startup
+                    if (lastKnownAirStatus == null) {
+                        lastKnownAirStatus = currentAirStatus
+                        lastKnownFanStatus = fanStatus
+                        lastKnownPumpStatus = pumpStatus
+                        return@addSnapshotListener
+                    }
                     
-                    if (lastKnownAirStatus != null && lastKnownAirStatus != currentAirStatus) {
+                    if (lastKnownAirStatus != currentAirStatus) {
                         val oldStatus = lastKnownAirStatus!!
                         lastKnownAirStatus = currentAirStatus // Update immediately to prevent duplicate triggers
                         
