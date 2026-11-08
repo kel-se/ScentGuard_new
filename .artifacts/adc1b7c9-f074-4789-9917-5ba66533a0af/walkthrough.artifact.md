@@ -1,21 +1,21 @@
-# Walkthrough: Login & Create Account UI Redesign
+# Walkthrough: Google Sign-In Error Handling & UI Improvement
 
-I have successfully redesigned the Login and Create Account screens on the `scentguard-experimental` branch to provide a modern, premium, minimalist authentication experience.
+I have improved the Google Sign-In error presentation and UI on the `scentguard-experimental` branch without modifying any backend or authentication architecture.
 
 ## Changes Made
 
 ### UI Layer
 
 #### [MODIFY] [LoginScreen.kt](file:///Users/michaelangelotorre/StudioProjects/ScentGuard_new/app/src/main/java/com/example/scentguard/ui/screens/login/LoginScreen.kt)
-- **Canvas-First Layout**: Removed the `ScentGuardCard` wrapper around form fields. Inputs, buttons, and social authentication buttons now sit naturally and cleanly on the screen background canvas.
-- **Typography & Headings**: Updated headings to "Welcome Back" with refined subtitle text.
-- **Refined Inputs & Spacing**: Polished input field container styling with subtle borders and generous vertical rhythm.
-
-#### [MODIFY] [SignUpScreen.kt](file:///Users/michaelangelotorre/StudioProjects/ScentGuard_new/app/src/main/java/com/example/scentguard/ui/screens/signup/SignUpScreen.kt)
-- **Canvas-First Layout**: Removed the `ScentGuardCard` form container, ensuring a consistent visual language with the Login screen.
-- **Headings & Tabs**: Updated heading to "Create Account" (or "Finalize Profile" in profile completion mode) while retaining Manager and Staff tabs naturally integrated into the canvas layout.
+- **Inline Error Notice**: Added `AuthErrorNotice` composable component rendered cleanly below the header when authentication errors occur.
+- **User-Friendly Error Mapping**:
+  - **User Cancellation**: Intercepted `GetCredentialCancellationException` to silently ignore user cancellation without showing error messages.
+  - **Missing Account**: Mapped missing account / credential errors to: *"No account found. Please sign up first or try another sign-in method."*
+  - **Network Issues**: Mapped `UnknownHostException` and `IOException` to: *"Connection problem. Please check your internet connection and try again."*
+  - **General Google/Auth Failures**: Mapped general exceptions to: *"Unable to sign in with Google. Please try again."*
+- **Auto-Dismiss & Retry**: Clearing error messages automatically when typing new input or retrying authentication.
 
 ## Verification Results
 
 - **Build**: `./gradlew app:assembleDebug` completed successfully (`BUILD SUCCESSFUL`).
-- **Backend Preservation**: Firebase Authentication, Google Sign-In, ViewModels, navigation, and role handling remain 100% intact and functional.
+- **Git Diff Inspection**: Confirmed that **only** `LoginScreen.kt` and local artifacts were modified. No backend files, repositories, ViewModels, or Firebase configuration files were altered.

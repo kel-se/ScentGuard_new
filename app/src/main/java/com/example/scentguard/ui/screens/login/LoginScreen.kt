@@ -10,6 +10,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.scentguard.R
@@ -55,6 +57,7 @@ fun LoginScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
     
     val loginState by viewModel.loginState.collectAsState()
     val onboardingCompleted by mainViewModel.onboardingCompleted.collectAsState()
@@ -78,15 +81,22 @@ fun LoginScreen(
         }
     }
 
-    LaunchedEffect(loginState, userProfile) {
+    LaunchedEffect(loginState) {
         if (loginState is Resource.Error) {
-            snackbarHostState.showSnackbar(
-                message = loginState.message ?: "Login failed",
-                duration = SnackbarDuration.Long
-            )
+            val rawMsg = loginState.message ?: ""
+            errorMessage = when {
+                rawMsg.contains("network", ignoreCase = true) || rawMsg.contains("connection", ignoreCase = true) || rawMsg.contains("unknownhost", ignoreCase = true) ->
+                    "Connection problem. Please check your internet connection and try again."
+                rawMsg.contains("no user", ignoreCase = true) || rawMsg.contains("not found", ignoreCase = true) || rawMsg.contains("no account", ignoreCase = true) ->
+                    "No account found. Please sign up first or try another sign-in method."
+                else ->
+                    "Unable to sign in. Please check your credentials and try again."
+            }
             viewModel.resetState()
         }
-        
+    }
+
+    LaunchedEffect(userProfile) {
         if (loginState is Resource.Success && userProfile is Resource.Error) {
             if (userProfile.message == "MISSING_PROFILE") {
                 Log.d("LoginScreen", "No ScentGuard profile detected for authenticated user. Redirecting to Setup.")
@@ -94,11 +104,7 @@ fun LoginScreen(
                     popUpTo(Screen.Login.route) { inclusive = true }
                 }
             } else {
-                snackbarHostState.showSnackbar(
-                    message = "Auth Success, but: ${userProfile.message ?: "Failed to fetch profile"}",
-                    duration = SnackbarDuration.Long,
-                    actionLabel = "Retry"
-                )
+                errorMessage = "Authentication succeeded, but failed to load profile. Please try again."
             }
         }
     }
@@ -143,12 +149,17 @@ fun LoginScreen(
                         text = "Sign in to access your restaurant dashboard.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 36.dp)
+                        modifier = Modifier.padding(top = 8.dp, bottom = 24.dp)
                     )
+
+                    if (errorMessage != null) {
+                        AuthErrorNotice(message = errorMessage!!)
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
 
                     OutlinedTextField(
                         value = email,
-                        onValueChange = { email = it },
+                        onValueChange = { email = it; errorMessage = null },
                         label = { Text("Email Address") },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
@@ -169,7 +180,7 @@ fun LoginScreen(
                     
                     OutlinedTextField(
                         value = password,
-                        onValueChange = { password = it },
+                        onValueChange = { password = it; errorMessage = null },
                         label = { Text("Password") },
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         trailingIcon = {
@@ -253,21 +264,30 @@ fun LoginScreen(
 
                             scope.launch {
                                 try {
+                                    errorMessage = null
                                     val result = credentialManager.getCredential(context, request)
                                     val credential = result.credential
                                     val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
                                     val idToken = googleIdTokenCredential.idToken
                                     viewModel.signInWithGoogle(idToken, hashedNonce)
+                                } catch (_: GetCredentialCancellationException) {
+                                    Log.d("LoginScreen", "Google Sign-In canceled by user.")
                                 } catch (e: GetCredentialException) {
                                     Log.e("LoginScreen", "Credential failure: ${e.message}", e)
-                                    scope.launch { 
-                                        snackbarHostState.showSnackbar("Google failure: ${e.type} - ${e.message}") 
+                                    errorMessage = when {
+                                        e.message?.contains("no credential", ignoreCase = true) == true ||
+                                        e.message?.contains("not found", ignoreCase = true) == true -> 
+                                            "No account found. Please sign up first or try another sign-in method."
+                                        else -> 
+                                            "Unable to sign in with Google. Please try again."
                                     }
+                                } catch (e: java.net.UnknownHostException) {
+                                    errorMessage = "Connection problem. Please check your internet connection and try again."
+                                } catch (e: java.io.IOException) {
+                                    errorMessage = "Connection problem. Please check your internet connection and try again."
                                 } catch (e: Exception) {
                                     Log.e("LoginScreen", "Unexpected error: ${e.message}", e)
-                                    scope.launch { 
-                                        snackbarHostState.showSnackbar("Error: ${e.localizedMessage}") 
-                                    }
+                                    errorMessage = "Unable to sign in with Google. Please try again."
                                 }
                             }
                         },
@@ -303,6 +323,35 @@ fun LoginScreen(
                     Spacer(modifier = Modifier.height(32.dp))
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun AuthErrorNotice(message: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f),
+        shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.2f))
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.ErrorOutline,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                fontWeight = FontWeight.Medium
+            )
         }
     }
 }

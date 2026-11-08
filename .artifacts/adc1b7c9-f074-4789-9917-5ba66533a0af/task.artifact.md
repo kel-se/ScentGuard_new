@@ -1,6 +1,6 @@
-# Task List: Login & Create Account UI Redesign
+# Task List: Google Sign-In Error Handling & UI Improvement
 
-- [x] Redesign `LoginScreen.kt` to remove form card wrapper, update heading to "Welcome Back", and place elements directly on the background canvas `[x]`
-- [x] Redesign `SignUpScreen.kt` to remove form card wrapper, update heading to "Create Account", and place elements directly on the background canvas `[x]`
+- [x] Implement `AuthErrorNotice` composable component and inline error state in `LoginScreen.kt` `[x]`
+- [x] Implement user-friendly error mapping for Google Sign-In exceptions (ignoring cancellations, mapping network & missing account errors) `[x]`
 - [x] Run `./gradlew app:assembleDebug` to verify build success `[x]`
 - [x] Create walkthrough artifact `[x]`
