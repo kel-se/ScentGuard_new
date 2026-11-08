@@ -1,26 +1,34 @@
-# Implementation Plan: ScentGuard Copyright Deposit Copy & Sanitization
+# Implementation Plan: Google Sign-In Error Handling & UI Improvement
 
-Prepare a clean, sanitized, and secure copy of the ScentGuard project for copyright registration deposit with the National Library of the Philippines (NLP) at `/Users/michaelangelotorre/StudioProjects/ScentGuard_Copyright_Deposit`.
+Improve Google Sign-In error mapping and present user-friendly inline error notices on the Login screen, ensuring clean handling of cancellations, missing accounts, and network errors without altering any backend authentication logic.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> - **Source Preservation**: All original source code (Kotlin UI, ViewModels, Services, Repositories, XML resources, and ESP32 firmware) will be preserved.
-> - **Credential Sanitization**: Public API keys and Firebase project references in `google-services.json` and `firmware/ScentGuard.ino` will be replaced with secure placeholders (`"AIzaSy...REDACTED"` / `"YOUR_API_KEY"`).
-> - **Exclusions**: Build directories (`build/`, `.gradle/`), IDE configuration (`.idea/`), and version control (`.git/`) will be strictly excluded from the copy.
+> - **Zero Backend Changes**: Firebase Authentication, Google Sign-In API options, ViewModels, and repositories remain completely untouched.
+> - **Cancellation Handling**: User cancellation of Google Sign-In will be treated as a normal user action with no error displayed.
+> - **Inline Error Notice UI**: A modern, subtle, soft-neutral/light-red error banner with an icon will be added to the Login screen for authentication errors.
 
 ## Proposed Changes
 
-### 1. [NEW] Folder Creation & Copying
-- Create target directory: `/Users/michaelangelotorre/StudioProjects/ScentGuard_Copyright_Deposit`
-- Copy source files, excluding `.git/`, `build/`, `.gradle/`, and `.idea/`.
+### UI Layer
 
-### 2. [MODIFY] Sanitizing Sensitive Configuration in Copy
-- **`app/google-services.json`**: Replace `current_key` value with `"AIzaSy...REDACTED"`.
-- **`firmware/ScentGuard.ino`**: Replace `API_KEY` definition with `"AIzaSy...REDACTED"`.
+#### [MODIFY] [LoginScreen.kt](file:///Users/michaelangelotorre/StudioProjects/ScentGuard_new/app/src/main/java/com/example/scentguard/ui/screens/login/LoginScreen.kt)
+- Add state for inline authentication error message (`errorMessage`).
+- Implement user-friendly error mapping for Google Sign-In exceptions and login failures:
+  - **Cancellation (`GetCredentialCancellationException`)**: Ignore / treat as normal user action.
+  - **No account / missing profile**: "No account found. Please sign up first or try another sign-in method."
+  - **Network / Connection issue**: "Connection problem. Please check your internet connection and try again."
+  - **General Google failure**: "Unable to sign in with Google. Please try again."
+- Create a reusable `AuthErrorNotice` composable component adhering to ScentGuard's design (soft-neutral/light-red error background, warning icon, rounded corners, concise text).
+- Position the error notice within the Login screen form flow.
 
-### 3. [NEW] Second Security Scan & Verification
-- Scan the copied directory (`ScentGuard_Copyright_Deposit`) to verify no unredacted private credentials or build artifacts exist.
+## Verification Plan
 
-## Verification & Reporting
-- Generate the final security compliance report detailing excluded files, sanitized credential files, retained code, and final copy location.
+### Automated Tests
+- Run `./gradlew app:assembleDebug` to verify compilation.
+
+### Manual Verification
+- Test canceling Google Sign-In (verify no error is shown).
+- Test invalid login / network errors (verify friendly error notice appears).
+- Test email/password login remains fully functional.
