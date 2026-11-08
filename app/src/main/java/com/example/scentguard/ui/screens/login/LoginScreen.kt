@@ -33,7 +33,6 @@ import com.example.scentguard.navigation.Screen
 import com.example.scentguard.ui.components.ScentGuardBackground
 import com.example.scentguard.ui.components.ScentGuardButton
 import com.example.scentguard.ui.components.GoogleButton
-import com.example.scentguard.ui.components.ScentGuardCard
 import com.example.scentguard.utils.Resource
 import com.example.scentguard.utils.responsiveContainer
 import com.example.scentguard.viewmodel.LoginViewModel
@@ -127,152 +126,157 @@ fun LoginScreen(
                     Image(
                         painter = painterResource(id = R.drawable.ic_scentguard_logo_vector),
                         contentDescription = null,
-                        modifier = Modifier.size(64.dp)
+                        modifier = Modifier.size(56.dp)
                     )
                     
-                    Spacer(modifier = Modifier.height(32.dp))
+                    Spacer(modifier = Modifier.height(28.dp))
                     
                     Text(
-                        text = "Sign in",
-                        style = MaterialTheme.typography.displayMedium, // Larger, more premium
+                        text = "Welcome Back",
+                        style = MaterialTheme.typography.displaySmall,
                         color = MaterialTheme.colorScheme.onBackground,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = (-1).sp
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = (-0.5).sp
                     )
                     
                     Text(
-                        text = "Access your restaurant dashboard",
+                        text = "Sign in to access your restaurant dashboard.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 12.dp, bottom = 48.dp)
+                        modifier = Modifier.padding(top = 8.dp, bottom = 36.dp)
                     )
 
-                    ScentGuardCard(
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        label = { Text("Email Address") },
                         modifier = Modifier.fillMaxWidth(),
-                        contentPadding = 28.dp, // More breathing room
-                        maxWidth = 420.dp
-                    ) {
-                        OutlinedTextField(
-                            value = email,
-                            onValueChange = { email = it },
-                            label = { Text("Email Address") },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Email,
-                                autoCorrectEnabled = false
-                            ),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
-                                unfocusedContainerColor = Color.Transparent,
-                                focusedContainerColor = Color.Transparent
-                            )
+                        shape = RoundedCornerShape(16.dp),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Email,
+                            autoCorrectEnabled = false
+                        ),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                            focusedContainerColor = MaterialTheme.colorScheme.surface
                         )
-                        
-                        Spacer(modifier = Modifier.height(20.dp))
-                        
-                        OutlinedTextField(
-                            value = password,
-                            onValueChange = { password = it },
-                            label = { Text("Password") },
-                            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                            trailingIcon = {
-                                val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
-                                IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                    Icon(imageVector = image, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
-                                unfocusedContainerColor = Color.Transparent,
-                                focusedContainerColor = Color.Transparent
-                            )
-                        )
-                        
-                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-                            TextButton(onClick = { navController.navigate(Screen.ForgotPassword.route) }) {
-                                Text(
-                                    "Forgot password?", 
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Bold
-                                )
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        label = { Text("Password") },
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(imageVector = image, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                        }
-                        
-                        Spacer(modifier = Modifier.height(32.dp))
-                        
-                        val isAnyLoading = loginState is Resource.Loading || (loginState is Resource.Success && userProfile is Resource.Loading)
-                        
-                        ScentGuardButton(
-                            text = "Sign in",
-                            onClick = { viewModel.login(email, password) },
-                            isLoading = isAnyLoading,
-                            maxWidth = 420.dp
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                            focusedContainerColor = MaterialTheme.colorScheme.surface
                         )
-
-                        Spacer(modifier = Modifier.height(32.dp))
-
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                            HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
-                            Text(" or ", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
-                            HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                    )
+                    
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp, bottom = 24.dp), 
+                        contentAlignment = Alignment.CenterEnd
+                    ) {
+                        TextButton(
+                            onClick = { navController.navigate(Screen.ForgotPassword.route) },
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text(
+                                "Forgot password?", 
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
+                    }
+                    
+                    val isAnyLoading = loginState is Resource.Loading || (loginState is Resource.Success && userProfile is Resource.Loading)
+                    
+                    ScentGuardButton(
+                        text = "Sign In",
+                        onClick = { viewModel.login(email, password) },
+                        isLoading = isAnyLoading,
+                        maxWidth = 420.dp
+                    )
 
-                        Spacer(modifier = Modifier.height(32.dp))
+                    Spacer(modifier = Modifier.height(28.dp))
 
-                        GoogleButton(
-                            onClick = {
-                                val rawNonce = UUID.randomUUID().toString()
-                                val bytes = rawNonce.toByteArray()
-                                val md = MessageDigest.getInstance("SHA-256")
-                                val digest = md.digest(bytes)
-                                val hashedNonce = digest.fold("") { str, it -> str + "%02x".format(it) }
-
-                                val googleIdOption = GetGoogleIdOption.Builder()
-                                    .setFilterByAuthorizedAccounts(false)
-                                    .setServerClientId("75241057260-05s50pjcl5a7sambng2qa999femjcr2i.apps.googleusercontent.com")
-                                    .setAutoSelectEnabled(false)
-                                    .setNonce(hashedNonce)
-                                    .build()
-
-                                val request = GetCredentialRequest.Builder()
-                                    .addCredentialOption(googleIdOption)
-                                    .build()
-
-                                scope.launch {
-                                    try {
-                                        val result = credentialManager.getCredential(context, request)
-                                        val credential = result.credential
-                                        val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
-                                        val idToken = googleIdTokenCredential.idToken
-                                        viewModel.signInWithGoogle(idToken, hashedNonce)
-                                    } catch (e: GetCredentialException) {
-                                        Log.e("LoginScreen", "Credential failure: ${e.message}", e)
-                                        scope.launch { 
-                                            snackbarHostState.showSnackbar("Google failure: ${e.type} - ${e.message}") 
-                                        }
-                                    } catch (e: Exception) {
-                                        Log.e("LoginScreen", "Unexpected error: ${e.message}", e)
-                                        scope.launch { 
-                                            snackbarHostState.showSnackbar("Error: ${e.localizedMessage}") 
-                                        }
-                                    }
-                                }
-                            },
-                            isLoading = loginState is Resource.Loading,
-                            enabled = !isAnyLoading,
-                            modifier = Modifier.fillMaxWidth()
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                        Text(
+                            text = " or continue with ", 
+                            style = MaterialTheme.typography.labelMedium, 
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.padding(horizontal = 8.dp)
                         )
+                        HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
                     }
 
-                    Spacer(modifier = Modifier.height(32.dp))
+                    Spacer(modifier = Modifier.height(28.dp))
+
+                    GoogleButton(
+                        onClick = {
+                            val rawNonce = UUID.randomUUID().toString()
+                            val bytes = rawNonce.toByteArray()
+                            val md = MessageDigest.getInstance("SHA-256")
+                            val digest = md.digest(bytes)
+                            val hashedNonce = digest.fold("") { str, it -> str + "%02x".format(it) }
+
+                            val googleIdOption = GetGoogleIdOption.Builder()
+                                .setFilterByAuthorizedAccounts(false)
+                                .setServerClientId("75241057260-05s50pjcl5a7sambng2qa999femjcr2i.apps.googleusercontent.com")
+                                .setAutoSelectEnabled(false)
+                                .setNonce(hashedNonce)
+                                .build()
+
+                            val request = GetCredentialRequest.Builder()
+                                .addCredentialOption(googleIdOption)
+                                .build()
+
+                            scope.launch {
+                                try {
+                                    val result = credentialManager.getCredential(context, request)
+                                    val credential = result.credential
+                                    val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
+                                    val idToken = googleIdTokenCredential.idToken
+                                    viewModel.signInWithGoogle(idToken, hashedNonce)
+                                } catch (e: GetCredentialException) {
+                                    Log.e("LoginScreen", "Credential failure: ${e.message}", e)
+                                    scope.launch { 
+                                        snackbarHostState.showSnackbar("Google failure: ${e.type} - ${e.message}") 
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e("LoginScreen", "Unexpected error: ${e.message}", e)
+                                    scope.launch { 
+                                        snackbarHostState.showSnackbar("Error: ${e.localizedMessage}") 
+                                    }
+                                }
+                            }
+                        },
+                        isLoading = loginState is Resource.Loading,
+                        enabled = !isAnyLoading,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(36.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -281,13 +285,16 @@ fun LoginScreen(
                     ) {
                         Text(
                             text = "Don't have an account? ",
-                            style = MaterialTheme.typography.bodyLarge,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        TextButton(onClick = { navController.navigate(Screen.SignUp.route) }) {
+                        TextButton(
+                            onClick = { navController.navigate(Screen.SignUp.route) },
+                            contentPadding = PaddingValues(4.dp)
+                        ) {
                             Text(
                                 text = "Sign up",
-                                style = MaterialTheme.typography.bodyLarge,
+                                style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
                             )

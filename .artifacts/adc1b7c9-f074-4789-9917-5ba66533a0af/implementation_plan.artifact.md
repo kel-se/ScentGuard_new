@@ -1,26 +1,33 @@
-# Implementation Plan: ScentGuard Copyright Deposit Copy & Sanitization
+# Implementation Plan: Login & Create Account UI Redesign
 
-Prepare a clean, sanitized, and secure copy of the ScentGuard project for copyright registration deposit with the National Library of the Philippines (NLP) at `/Users/michaelangelotorre/StudioProjects/ScentGuard_Copyright_Deposit`.
+Redesign the Login and Create Account screens of the ScentGuard Android app into a modern, premium, minimalist authentication experience on the `scentguard-experimental` branch, eliminating form cards/containers and placing all elements naturally on the background canvas.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> - **Source Preservation**: All original source code (Kotlin UI, ViewModels, Services, Repositories, XML resources, and ESP32 firmware) will be preserved.
-> - **Credential Sanitization**: Public API keys and Firebase project references in `google-services.json` and `firmware/ScentGuard.ino` will be replaced with secure placeholders (`"AIzaSy...REDACTED"` / `"YOUR_API_KEY"`).
-> - **Exclusions**: Build directories (`build/`, `.gradle/`), IDE configuration (`.idea/`), and version control (`.git/`) will be strictly excluded from the copy.
+> - **Canvas-First Layout**: Removed `ScentGuardCard` containers around form fields. Inputs, buttons, and social login buttons will now sit naturally and cleanly on the screen background.
+> - **Typography & Headings**: Updated headings to "Welcome Back" on Login and "Create Account" on Registration with refined spacing and typography.
+> - **Backend Integrity**: All Firebase Auth, Google Sign-In, ViewModels, navigation, and validation logic remain 100% intact.
 
 ## Proposed Changes
 
-### 1. [NEW] Folder Creation & Copying
-- Create target directory: `/Users/michaelangelotorre/StudioProjects/ScentGuard_Copyright_Deposit`
-- Copy source files, excluding `.git/`, `build/`, `.gradle/`, and `.idea/`.
+### UI Layer
 
-### 2. [MODIFY] Sanitizing Sensitive Configuration in Copy
-- **`app/google-services.json`**: Replace `current_key` value with `"AIzaSy...REDACTED"`.
-- **`firmware/ScentGuard.ino`**: Replace `API_KEY` definition with `"AIzaSy...REDACTED"`.
+#### [MODIFY] [LoginScreen.kt](file:///Users/michaelangelotorre/StudioProjects/ScentGuard_new/app/src/main/java/com/example/scentguard/ui/screens/login/LoginScreen.kt)
+- Remove `ScentGuardCard` wrapper around inputs and buttons.
+- Update heading to "Welcome Back".
+- Ensure clean spacing, subtle input field borders, prominent primary green button, subtle divider with "or continue with", and Google sign-in button directly on the background canvas.
 
-### 3. [NEW] Second Security Scan & Verification
-- Scan the copied directory (`ScentGuard_Copyright_Deposit`) to verify no unredacted private credentials or build artifacts exist.
+#### [MODIFY] [SignUpScreen.kt](file:///Users/michaelangelotorre/StudioProjects/ScentGuard_new/app/src/main/java/com/example/scentguard/ui/screens/signup/SignUpScreen.kt)
+- Remove `ScentGuardCard` wrapper around inputs and buttons.
+- Update heading to "Create Account" (and "Finalize profile" when in complete profile mode).
+- Maintain Manager/Staff tab switching, form fields, loading progress indicator, and navigation naturally on the background canvas.
 
-## Verification & Reporting
-- Generate the final security compliance report detailing excluded files, sanitized credential files, retained code, and final copy location.
+## Verification Plan
+
+### Automated Tests
+- Run `./gradlew app:assembleDebug` to verify compilation and UI integrity.
+
+### Manual Verification
+- Verify that Login and Create Account screens match the minimalist canvas-first design (no rounded white card containers).
+- Verify all authentication interactions (Sign In, Google Sign In, Forgot Password, Manager/Staff registration, profile completion) function correctly.

@@ -1,6 +1,6 @@
-# Task List: ScentGuard Copyright Deposit Preparation
+# Task List: Login & Create Account UI Redesign
 
-- [ ] Create `ScentGuard_Copyright_Deposit` folder and copy clean source files (excluding `.git`, `build`, `.gradle`, `.idea`) `[ ]`
-- [ ] Sanitize sensitive configuration and API keys in `google-services.json` and `firmware/ScentGuard.ino` `[ ]`
-- [ ] Perform second security scan against `ScentGuard_Copyright_Deposit` `[ ]`
-- [ ] Compile final security report `[ ]`
+- [x] Redesign `LoginScreen.kt` to remove form card wrapper, update heading to "Welcome Back", and place elements directly on the background canvas `[x]`
+- [x] Redesign `SignUpScreen.kt` to remove form card wrapper, update heading to "Create Account", and place elements directly on the background canvas `[x]`
+- [x] Run `./gradlew app:assembleDebug` to verify build success `[x]`
+- [x] Create walkthrough artifact `[x]`

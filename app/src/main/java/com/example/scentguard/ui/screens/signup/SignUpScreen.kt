@@ -22,7 +22,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.CircleShape
@@ -32,7 +31,6 @@ import com.example.scentguard.R
 import com.example.scentguard.navigation.Screen
 import com.example.scentguard.ui.components.ScentGuardBackground
 import com.example.scentguard.ui.components.ScentGuardButton
-import com.example.scentguard.ui.components.ScentGuardCard
 import com.example.scentguard.utils.Resource
 import com.example.scentguard.utils.responsiveContainer
 import com.example.scentguard.viewmodel.MainViewModel
@@ -118,7 +116,7 @@ fun SignUpScreen(
             ) {
                 Column(
                     modifier = Modifier
-                        .responsiveContainer(maxWidth = 440.dp)
+                        .responsiveContainer(maxWidth = 420.dp)
                         .padding(horizontal = 24.dp)
                         .verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.Start
@@ -128,206 +126,202 @@ fun SignUpScreen(
                     Image(
                         painter = painterResource(id = R.drawable.ic_scentguard_logo_vector),
                         contentDescription = null,
-                        modifier = Modifier.size(64.dp)
+                        modifier = Modifier.size(56.dp)
                     )
                     
-                    Spacer(modifier = Modifier.height(32.dp))
+                    Spacer(modifier = Modifier.height(28.dp))
                     
                     Text(
-                        text = if (isCompleteProfileMode) "Finalize profile" else "Register",
-                        style = MaterialTheme.typography.displayMedium,
+                        text = if (isCompleteProfileMode) "Finalize Profile" else "Create Account",
+                        style = MaterialTheme.typography.displaySmall,
                         color = MaterialTheme.colorScheme.onBackground,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = (-1).sp
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = (-0.5).sp
                     )
                     
                     Text(
-                        text = if (isCompleteProfileMode) "Finish setting up your workspace" else "Join the ScentGuard network",
+                        text = if (isCompleteProfileMode) "Finish setting up your workspace." else "Set up your account to start monitoring your restaurant environment.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 12.dp, bottom = 24.dp)
+                        modifier = Modifier.padding(top = 8.dp, bottom = 24.dp)
                     )
 
-                    TabRow(
-                        selectedTabIndex = selectedTab,
-                        containerColor = Color.Transparent,
-                        divider = {},
-                        modifier = Modifier.padding(bottom = 24.dp),
-                        indicator = { tabPositions ->
-                            if (selectedTab < tabPositions.size) {
-                                TabRowDefaults.SecondaryIndicator(
-                                    modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]).clip(CircleShape),
-                                    color = MaterialTheme.colorScheme.primary
-                                )
+                    if (!isCompleteProfileMode) {
+                        TabRow(
+                            selectedTabIndex = selectedTab,
+                            containerColor = Color.Transparent,
+                            divider = {},
+                            modifier = Modifier.padding(bottom = 24.dp),
+                            indicator = { tabPositions ->
+                                if (selectedTab < tabPositions.size) {
+                                    TabRowDefaults.SecondaryIndicator(
+                                        modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]).clip(CircleShape),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
                             }
+                        ) {
+                            Tab(
+                                selected = selectedTab == 0,
+                                onClick = { selectedTab = 0 },
+                                text = { Text("Manager", fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Medium) },
+                                selectedContentColor = MaterialTheme.colorScheme.primary,
+                                unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            )
+                            Tab(
+                                selected = selectedTab == 1,
+                                onClick = { selectedTab = 1 },
+                                text = { Text("Staff", fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Medium) },
+                                selectedContentColor = MaterialTheme.colorScheme.primary,
+                                unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            )
                         }
-                    ) {
-                        Tab(
-                            selected = selectedTab == 0,
-                            onClick = { selectedTab = 0 },
-                            text = { Text("Manager", fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Medium) },
-                            selectedContentColor = MaterialTheme.colorScheme.primary,
-                            unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                        )
-                        Tab(
-                            selected = selectedTab == 1,
-                            onClick = { selectedTab = 1 },
-                            text = { Text("Staff", fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Medium) },
-                            selectedContentColor = MaterialTheme.colorScheme.primary,
-                            unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                        )
                     }
 
-                    ScentGuardCard(
+                    OutlinedTextField(
+                        value = fullName,
+                        onValueChange = { fullName = it },
+                        label = { Text("Full Name") },
                         modifier = Modifier.fillMaxWidth(),
-                        contentPadding = 28.dp,
-                        maxWidth = 440.dp
-                    ) {
-                        OutlinedTextField(
-                            value = fullName,
-                            onValueChange = { fullName = it },
-                            label = { Text("Full Name") },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
-                                unfocusedContainerColor = Color.Transparent,
-                                focusedContainerColor = Color.Transparent
-                            )
+                        shape = RoundedCornerShape(16.dp),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                            focusedContainerColor = MaterialTheme.colorScheme.surface
                         )
-                        
-                        Spacer(modifier = Modifier.height(20.dp))
-                        
-                        OutlinedTextField(
-                            value = restaurantInput,
-                            onValueChange = { restaurantInput = it },
-                            label = { 
-                                Text(if (selectedTab == 0) "Restaurant Name" else "Invitation Code") 
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
-                                unfocusedContainerColor = Color.Transparent,
-                                focusedContainerColor = Color.Transparent
-                            ),
-                            placeholder = {
-                                if (selectedTab == 1) Text("Enter 6-digit code")
-                            }
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    OutlinedTextField(
+                        value = restaurantInput,
+                        onValueChange = { restaurantInput = it },
+                        label = { 
+                            Text(if (selectedTab == 0) "Restaurant Name" else "Invitation Code") 
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                            focusedContainerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        placeholder = {
+                            if (selectedTab == 1) Text("Enter 6-digit code")
+                        }
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        label = { Text("Email Address") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        singleLine = true,
+                        readOnly = isCompleteProfileMode,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Email,
+                            autoCorrectEnabled = false
+                        ),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                            focusedContainerColor = MaterialTheme.colorScheme.surface
                         )
-                        
-                        Spacer(modifier = Modifier.height(20.dp))
-                        
-                        OutlinedTextField(
-                            value = email,
-                            onValueChange = { email = it },
-                            label = { Text("Email Address") },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            singleLine = true,
-                            readOnly = isCompleteProfileMode,
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Email,
-                                autoCorrectEnabled = false
-                            ),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
-                                unfocusedContainerColor = Color.Transparent,
-                                focusedContainerColor = Color.Transparent
-                            )
-                        )
-                        
-                        if (isCompleteProfileMode) {
-                            TextButton(
-                                onClick = { 
-                                    mainViewModel.logout()
-                                    email = ""
-                                },
-                                modifier = Modifier.align(Alignment.End)
-                            ) {
-                                Text("Not you? Sign out", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                            }
-                        }
-                        
-                        if (!isCompleteProfileMode) {
-                            Spacer(modifier = Modifier.height(20.dp))
-                            OutlinedTextField(
-                                value = password,
-                                onValueChange = { password = it },
-                                label = { Text("Password") },
-                                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                                trailingIcon = {
-                                    val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
-                                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                        Icon(imageVector = image, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(16.dp),
-                                singleLine = true,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
-                                    unfocusedContainerColor = Color.Transparent,
-                                    focusedContainerColor = Color.Transparent
-                                )
-                            )
-                            
-                            Spacer(modifier = Modifier.height(20.dp))
-                            OutlinedTextField(
-                                value = confirmPassword,
-                                onValueChange = { confirmPassword = it },
-                                label = { Text("Confirm Password") },
-                                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(16.dp),
-                                singleLine = true,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
-                                    unfocusedContainerColor = Color.Transparent,
-                                    focusedContainerColor = Color.Transparent
-                                )
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(32.dp))
-
-                        if (registrationState is Resource.Loading) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                                LinearProgressIndicator(
-                                    modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                                )
-                                Text(
-                                    text = statusMessage,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    modifier = Modifier.padding(top = 8.dp),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(16.dp))
-                        }
-
-                        ScentGuardButton(
-                            text = if (isCompleteProfileMode) "Finalize Setup" else if (selectedTab == 0) "Create Account" else "Join Restaurant",
+                    )
+                    
+                    if (isCompleteProfileMode) {
+                        TextButton(
                             onClick = { 
-                                val role = if (selectedTab == 0) "Manager" else "Staff"
-                                viewModel.register(fullName, restaurantInput, email, role, password, confirmPassword) 
+                                mainViewModel.logout()
+                                email = ""
                             },
-                            isLoading = registrationState is Resource.Loading,
-                            maxWidth = 440.dp
+                            modifier = Modifier.align(Alignment.End)
+                        ) {
+                            Text("Not you? Sign out", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                    
+                    if (!isCompleteProfileMode) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        OutlinedTextField(
+                            value = password,
+                            onValueChange = { password = it },
+                            label = { Text("Password") },
+                            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                            trailingIcon = {
+                                val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                    Icon(imageVector = image, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                                focusedContainerColor = MaterialTheme.colorScheme.surface
+                            )
+                        )
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        OutlinedTextField(
+                            value = confirmPassword,
+                            onValueChange = { confirmPassword = it },
+                            label = { Text("Confirm Password") },
+                            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                                focusedContainerColor = MaterialTheme.colorScheme.surface
+                            )
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(32.dp))
+                    Spacer(modifier = Modifier.height(28.dp))
+
+                    if (registrationState is Resource.Loading) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                            LinearProgressIndicator(
+                                modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape),
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                            )
+                            Text(
+                                text = statusMessage,
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.padding(top = 8.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+
+                    ScentGuardButton(
+                        text = if (isCompleteProfileMode) "Finalize Setup" else if (selectedTab == 0) "Create Account" else "Join Restaurant",
+                        onClick = { 
+                            val role = if (selectedTab == 0) "Manager" else "Staff"
+                            viewModel.register(fullName, restaurantInput, email, role, password, confirmPassword) 
+                        },
+                        isLoading = registrationState is Resource.Loading,
+                        maxWidth = 420.dp
+                    )
+
+                    Spacer(modifier = Modifier.height(36.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -335,14 +329,17 @@ fun SignUpScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Have an account? ",
-                            style = MaterialTheme.typography.bodyLarge,
+                            text = "Already have an account? ",
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        TextButton(onClick = { navController.popBackStack() }) {
+                        TextButton(
+                            onClick = { navController.popBackStack() },
+                            contentPadding = PaddingValues(4.dp)
+                        ) {
                             Text(
                                 text = "Sign in",
-                                style = MaterialTheme.typography.bodyLarge,
+                                style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
                             )
